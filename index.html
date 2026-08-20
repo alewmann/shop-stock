@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1F3A34">
+<title>Shop Stock</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- Top bar -->
+  <header class="topbar">
+    <span class="brand">Shop stock</span>
+    <button id="lowStockBtn" class="icon-btn" aria-label="Low stock alerts">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 2 L22 20 L2 20 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16.7" r="1" fill="currentColor"/></svg>
+      <span id="lowStockDot" class="dot" hidden></span>
+    </button>
+  </header>
+
+  <!-- Low stock banner -->
+  <div id="lowStockBanner" class="banner" hidden></div>
+
+  <!-- Main screens -->
+  <main id="screens">
+
+    <!-- STOCK SCREEN -->
+    <section id="screen-stock" class="screen active">
+      <div id="itemGrid" class="item-grid"></div>
+    </section>
+
+    <!-- SALE / RESTOCK FLOW (shared) -->
+    <section id="screen-flow" class="screen">
+      <div class="flow-header">
+        <button id="flowBack" class="text-btn" aria-label="Back">&larr;</button>
+        <span id="flowTitle" class="flow-title">Record a sale</span>
+      </div>
+      <div id="flowBody"></div>
+    </section>
+
+    <!-- HISTORY SCREEN -->
+    <section id="screen-history" class="screen">
+      <div class="history-controls">
+        <select id="historyRange">
+          <option value="today">Today</option>
+          <option value="week">This week</option>
+          <option value="month">This month</option>
+          <option value="all">All time</option>
+        </select>
+        <button id="exportBtn" class="text-btn">Export CSV</button>
+      </div>
+      <div id="historySummary" class="history-summary"></div>
+      <div id="historyList" class="history-list"></div>
+    </section>
+
+    <!-- SETTINGS SCREEN -->
+    <section id="screen-settings" class="screen">
+      <div id="settingsList"></div>
+    </section>
+
+  </main>
+
+  <!-- Bottom nav -->
+  <nav class="bottomnav">
+    <button class="navbtn active" data-screen="stock">
+      <svg viewBox="0 0 24 24" width="22" height="22"><rect x="3" y="3" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="3" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="3" y="13" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="13" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+      <span>Stock</span>
+    </button>
+    <button class="navbtn" data-action="new-sale">
+      <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.7"/><line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <span>Sale</span>
+    </button>
+    <button class="navbtn" data-action="new-restock">
+      <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.7"/><line x1="12" y1="8" x2="12" y2="16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <span>Restock</span>
+    </button>
+    <button class="navbtn" data-screen="history">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 4 v6 h6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 12.5 A8 8 0 1 0 6 6.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <span>History</span>
+    </button>
+    <button class="navbtn" data-screen="settings">
+      <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="2.8" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 3.5 v2.4 M12 18.1 v2.4 M20.5 12 h-2.4 M5.9 12 h-2.4 M17.8 6.2 l-1.7 1.7 M7.9 16.1 l-1.7 1.7 M17.8 17.8 l-1.7-1.7 M7.9 7.9 l-1.7-1.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span>Settings</span>
+    </button>
+  </nav>
+
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

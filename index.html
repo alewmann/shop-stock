@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#1F3A34">
-<title>Shop Stock</title>
+<meta name="theme-color" content="#1B3B33">
+<title>AB Collection Stock</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -12,11 +12,58 @@
 </head>
 <body>
 
-<div id="app">
+<!-- AUTH SCREEN (setup or login) -->
+<div id="authScreen" class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-mono">AB</div>
+      <div class="auth-logo-line"></div>
+      <div class="auth-logo-sub">COLLECTION</div>
+    </div>
+
+    <!-- Setup mode (first run) -->
+    <div id="authSetup" style="display:none;">
+      <div class="auth-title">Set up admin access</div>
+      <div class="auth-sub">Create a username and password to protect this app.</div>
+      <div class="field-row">
+        <label class="field-label">Username</label>
+        <input type="text" id="setupUser" autocomplete="username">
+      </div>
+      <div class="field-row">
+        <label class="field-label">Password</label>
+        <input type="password" id="setupPass" autocomplete="new-password">
+      </div>
+      <div class="field-row">
+        <label class="field-label">Confirm password</label>
+        <input type="password" id="setupPass2" autocomplete="new-password">
+      </div>
+      <div id="setupError" class="error-text" style="display:none;"></div>
+      <button class="primary full" id="setupBtn">Create account</button>
+    </div>
+
+    <!-- Login mode -->
+    <div id="authLogin" style="display:none;">
+      <div class="auth-title">Admin login</div>
+      <div class="auth-sub">Enter your details to open the app.</div>
+      <div class="field-row">
+        <label class="field-label">Username</label>
+        <input type="text" id="loginUser" autocomplete="username">
+      </div>
+      <div class="field-row">
+        <label class="field-label">Password</label>
+        <input type="password" id="loginPass" autocomplete="current-password">
+      </div>
+      <div id="loginError" class="error-text" style="display:none;"></div>
+      <button class="primary full" id="loginBtn">Log in</button>
+    </div>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
 
   <!-- Top bar -->
   <header class="topbar">
-    <span class="brand">Shop stock</span>
+    <span class="brand">AB Collection</span>
     <button id="lowStockBtn" class="icon-btn" aria-label="Low stock alerts">
       <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 2 L22 20 L2 20 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16.7" r="1" fill="currentColor"/></svg>
       <span id="lowStockDot" class="dot" hidden></span>
@@ -95,5 +142,6 @@
 
 <script src="data.js"></script>
 <script src="app.js"></script>
+<script src="auth.js"></script>
 </body>
 </html>

@@ -1,10 +1,11 @@
-const CACHE_NAME = 'shop-stock-v1';
+const CACHE_NAME = 'shop-stock-v2';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './data.js',
   './app.js',
+  './auth.js',
   './manifest.json',
   './icon-192.png',
   './icon-512.png'

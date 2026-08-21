@@ -404,6 +404,10 @@ function renderSettings(){
   });
   html += `</div>
   <div class="settings-section">
+    <div class="settings-title">Account</div>
+    <button class="full" id="logoutBtn">Log out</button>
+  </div>
+  <div class="settings-section">
     <div class="settings-title">Data</div>
     <button class="full" id="resetBtn" style="border-color:var(--danger);color:var(--danger);">Reset all data</button>
   </div>`;
@@ -429,6 +433,9 @@ function renderSettings(){
       showToast('Alert threshold updated for ' + item.name);
       updateLowStockUI();
     });
+  });
+  document.getElementById('logoutBtn').addEventListener('click', ()=>{
+    if(typeof logOut === 'function') logOut();
   });
   document.getElementById('resetBtn').addEventListener('click', ()=>{
     if(confirm('This clears all stock counts and sales history. This cannot be undone. Continue?')){

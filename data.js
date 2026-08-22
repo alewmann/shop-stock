@@ -6,7 +6,7 @@ const DEFAULT_ITEMS = [
   { id:'shirt',   name:'Shirt',    icon:'shirt',   sellPrice:600,  sizes:['S','M','L','XL','XXL','XXXL'] },
   { id:'trouser', name:'Trouser',  icon:'trouser', sellPrice:700,  sizes:['30','32','34','36','38','40'] },
   { id:'sweater', name:'Sweater',  icon:'sweater', sellPrice:850,  sizes:['S','M','L','XL','XXL','XXXL'] },
-  { id:'coat',    name:'Coat',     icon:'sweater', sellPrice:1800, sizes:['S','M','L','XL','XXL','XXXL'] },
+  { id:'coat',    name:'Coat',     icon:'coat',    sellPrice:1800, sizes:['S','M','L','XL','XXL','XXXL'] },
   { id:'shoe',    name:'Shoe',     icon:'shoe',    sellPrice:1200, sizes:['40','41','42','43','44','45'] }
 ];
 const DEFAULT_THRESHOLD = 5;
@@ -34,6 +34,11 @@ const Store = {
       if(!raw) return buildDefaultState();
       const parsed = JSON.parse(raw);
       if(!parsed.items || !parsed.transactions) return buildDefaultState();
+      // keep icon/name in sync with current defaults without touching stock data
+      parsed.items.forEach(item => {
+        const def = DEFAULT_ITEMS.find(d => d.id === item.id);
+        if(def){ item.icon = def.icon; item.name = def.name; }
+      });
       return parsed;
     }catch(e){
       return buildDefaultState();

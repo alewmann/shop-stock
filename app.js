@@ -5,10 +5,11 @@ let flow = null; // {mode:'sale'|'restock', item, size, qty}
 /* ---------- icons ---------- */
 function iconSvg(name){
   const icons = {
-    shirt: '<path d="M8 4 L4 7 L6 10 L8 8.5 V20 H16 V8.5 L18 10 L20 7 L16 4 Q14 6 12 6 Q10 6 8 4 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
-    trouser: '<path d="M6 3 H18 L19 21 H14.5 L12 10 L9.5 21 H5 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
-    sweater: '<path d="M7 4 L3 7 L5.5 10 L7 9 V20 H17 V9 L18.5 10 L21 7 L17 4 Q15.5 6.5 12 6.5 Q8.5 6.5 7 4 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
-    shoe: '<path d="M3 17 Q3 14 6 13.5 L10 12 L13 8.5 Q14.5 7 16.5 8 L17.5 10 Q19 10.5 20.5 12.5 Q21.5 14 21 17 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>'
+    shirt: '<path d="M8.5 3.5 L4 6.5 L6.2 9.7 L8.5 8.2 V20.5 H15.5 V8.2 L17.8 9.7 L20 6.5 L15.5 3.5 Q14.3 5.6 12 5.6 Q9.7 5.6 8.5 3.5 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>',
+    trouser: '<path d="M7 3.5 H17 L17.8 20.5 H13.6 L12 11.5 L10.4 20.5 H6.2 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><line x1="7.15" y1="6.3" x2="16.85" y2="6.3" stroke="currentColor" stroke-width="1.5"/>',
+    sweater: '<path d="M8 3.6 L3.8 6.3 L5.9 9.6 L8 8.3 V20.4 H16 V8.3 L18.1 9.6 L20.2 6.3 L16 3.6 Q14.6 6.1 12 6.1 Q9.4 6.1 8 3.6 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><path d="M9.6 3.9 Q10.6 5 12 5 Q13.4 5 14.4 3.9" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    coat: '<path d="M8.2 3.6 L4 6.3 L6.1 9.5 L8.2 8.2 V21 H10.6 L12 15.5 L13.4 21 H15.8 V8.2 L17.9 9.5 L20 6.3 L15.8 3.6 L12 6.6 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><line x1="10.6" y1="9" x2="10.6" y2="15" stroke="currentColor" stroke-width="1.2"/>',
+    shoe: '<path d="M3.5 17.2 Q3.3 14.6 6 13.9 L9.3 13 L12.6 9 Q13.6 7.7 15 8.4 L15.6 9.9 Q17.6 10.4 19.3 12.5 Q20.9 14.4 20.4 17.2 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><line x1="9.3" y1="13" x2="9.3" y2="17.2" stroke="currentColor" stroke-width="1.3"/>'
   };
   return `<svg viewBox="0 0 24 24" width="20" height="20">${icons[name]||icons.shirt}</svg>`;
 }
@@ -61,7 +62,45 @@ document.getElementById('lowStockBanner').addEventListener('click', ()=>{
 });
 
 /* ---------- STOCK SCREEN ---------- */
+function renderDashboard(){
+  const totalUnits = state.items.reduce((s,it)=>s+totalQty(it),0);
+  const today0 = new Date(); today0.setHours(0,0,0,0);
+  const todaysSales = state.transactions.filter(t=>t.type==='sale' && t.timestamp >= today0.getTime());
+  const todaysRevenue = todaysSales.reduce((s,t)=>s+t.amount,0);
+  const lowCount = lowStockCount();
+
+  const wrap = document.getElementById('dashStats');
+  wrap.innerHTML = `
+    <div class="dash-greeting">
+      <div class="dash-eyebrow">${greetingLabel()}</div>
+      <div class="dash-date">${new Date().toLocaleDateString(undefined,{weekday:'long', month:'long', day:'numeric'})}</div>
+    </div>
+    <div class="dash-grid">
+      <div class="dash-card">
+        <div class="dash-card-label">Today's revenue</div>
+        <div class="dash-card-val">${fmtBirr(todaysRevenue)}</div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-label">Units in stock</div>
+        <div class="dash-card-val">${totalUnits}</div>
+      </div>
+      <div class="dash-card ${lowCount>0 ? 'dash-card-warn' : ''}">
+        <div class="dash-card-label">Low stock</div>
+        <div class="dash-card-val">${lowCount}</div>
+      </div>
+    </div>
+  `;
+}
+
+function greetingLabel(){
+  const h = new Date().getHours();
+  if(h < 12) return 'Good morning';
+  if(h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 function renderStock(){
+  renderDashboard();
   const grid = document.getElementById('itemGrid');
   grid.innerHTML = '';
   state.items.forEach(item=>{
@@ -308,8 +347,10 @@ function rangeStart(range){
   return 0;
 }
 
+let historyRangeValue = 'today';
+
 function renderHistory(){
-  const range = document.getElementById('historyRange').value;
+  const range = historyRangeValue;
   const start = rangeStart(range);
   const txns = state.transactions.filter(t => t.timestamp >= start);
 
@@ -349,7 +390,14 @@ function renderHistory(){
   }).join('');
 }
 
-document.getElementById('historyRange').addEventListener('change', renderHistory);
+document.querySelectorAll('#historySegmented .seg-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#historySegmented .seg-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    historyRangeValue = btn.dataset.range;
+    renderHistory();
+  });
+});
 
 document.getElementById('exportBtn').addEventListener('click', ()=>{
   if(state.transactions.length === 0){

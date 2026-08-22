@@ -63,7 +63,10 @@
 
   <!-- Top bar -->
   <header class="topbar">
-    <span class="brand">AB Collection</span>
+    <div class="brand-group">
+      <div class="brand-badge">AB</div>
+      <span class="brand">AB Collection</span>
+    </div>
     <button id="lowStockBtn" class="icon-btn" aria-label="Low stock alerts">
       <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 2 L22 20 L2 20 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16.7" r="1" fill="currentColor"/></svg>
       <span id="lowStockDot" class="dot" hidden></span>
@@ -78,6 +81,10 @@
 
     <!-- STOCK SCREEN -->
     <section id="screen-stock" class="screen active">
+      <div id="dashStats" class="dash-stats"></div>
+      <div class="section-header">
+        <span class="section-title">Inventory</span>
+      </div>
       <div id="itemGrid" class="item-grid"></div>
     </section>
 
@@ -92,13 +99,14 @@
 
     <!-- HISTORY SCREEN -->
     <section id="screen-history" class="screen">
+      <div class="segmented" id="historySegmented">
+        <button class="seg-btn active" data-range="today">Today</button>
+        <button class="seg-btn" data-range="week">Week</button>
+        <button class="seg-btn" data-range="month">Month</button>
+        <button class="seg-btn" data-range="all">All</button>
+      </div>
       <div class="history-controls">
-        <select id="historyRange">
-          <option value="today">Today</option>
-          <option value="week">This week</option>
-          <option value="month">This month</option>
-          <option value="all">All time</option>
-        </select>
+        <div class="history-controls-spacer"></div>
         <button id="exportBtn" class="text-btn">Export CSV</button>
       </div>
       <div id="historySummary" class="history-summary"></div>

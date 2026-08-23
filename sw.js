@@ -1,9 +1,11 @@
-const CACHE_NAME = 'shop-stock-v7';
+const CACHE_NAME = 'shop-stock-v9';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './data.js',
+  './firebase-config.js',
+  './sync.js',
   './app.js',
   './auth.js',
   './barcode.js',

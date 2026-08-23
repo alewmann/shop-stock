@@ -90,6 +90,23 @@ body{
   background:var(--danger);
   border:1.5px solid var(--bg);
 }
+.sync-badge{
+  font-size:9.5px;
+  font-weight:700;
+  padding:3px 8px;
+  border-radius:20px;
+  text-transform:uppercase;
+  letter-spacing:0.03em;
+  margin-left:2px;
+}
+.sync-badge.sync-on{
+  background:var(--primary-soft);
+  color:var(--primary);
+}
+.sync-badge.sync-off{
+  background:var(--danger-soft);
+  color:var(--danger);
+}
 
 /* Low stock banner */
 .banner{

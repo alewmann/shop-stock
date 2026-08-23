@@ -1,4 +1,3 @@
-let state = Store.load();
 let expandedItemId = null;
 let flow = null; // {mode:'sale'|'restock', item, size, qty}
 
@@ -254,17 +253,20 @@ function renderFlow(){
       c.className = 'pick-card';
       const low = sz.qty <= sz.threshold;
       c.innerHTML = `<div class="pick-card-label">${sz.label}</div><div class="pick-card-sub" style="${low?'color:var(--danger);font-weight:700;':''}">${sz.qty} in stock</div>`;
-      c.addEventListener('click', ()=>{
+      c.addEventListener('click', async ()=>{
         if(flow.mode === 'sale' && sz.qty <= 0){
           showToast('No stock left for this size.');
           return;
         }
         if(flow.linkingBarcode){
-          if(!state.barcodeMap) state.barcodeMap = {};
-          state.barcodeMap[flow.linkingBarcode] = { itemId: flow.item.id, sizeId: sz.id };
-          Store.save(state);
-          showToast('Barcode linked to ' + flow.item.name + ' · ' + sz.label);
+          const code = flow.linkingBarcode;
           flow.linkingBarcode = null;
+          try{
+            await cloudSaveBarcode(code, flow.item.id, sz.id, sz.label);
+            showToast('Barcode linked to ' + flow.item.name + ' · ' + sz.label);
+          }catch(e){
+            showToast('Could not save the barcode link — try again.');
+          }
         }
         flow.size = sz;
         flow.qty = 1;
@@ -323,7 +325,7 @@ function updateQtyUI(){
   if(totalEl) totalEl.textContent = fmtBirr(flow.size.sellPrice * flow.qty);
 }
 
-function confirmFlow(){
+async function confirmFlow(){
   const errEl = document.getElementById('flowError');
   if(!flow.qty || flow.qty < 1){
     errEl.style.display = 'block';
@@ -338,32 +340,26 @@ function confirmFlow(){
   errEl.style.display = 'none';
 
   const s = flow.size;
-  if(flow.mode === 'sale'){
-    s.qty -= flow.qty;
-  }else{
-    s.qty += flow.qty;
-  }
-  const txn = {
-    id: uid(),
-    itemId: flow.item.id,
-    itemName: flow.item.name,
-    sizeId: s.id,
-    sizeLabel: s.label,
-    type: flow.mode,
-    qty: flow.qty,
-    amount: flow.mode === 'sale' ? s.sellPrice * flow.qty : 0,
-    timestamp: Date.now()
-  };
-  state.transactions.unshift(txn);
-  Store.save(state);
+  const confirmBtn = document.getElementById('confirmBtn');
+  if(confirmBtn){ confirmBtn.disabled = true; confirmBtn.textContent = 'Saving...'; }
 
+  try{
+    await cloudRecordTransaction(flow.item, s, flow.mode, flow.qty);
+  }catch(e){
+    errEl.style.display = 'block';
+    errEl.textContent = 'Could not save — check your internet connection and try again.';
+    if(confirmBtn){ confirmBtn.disabled = false; confirmBtn.textContent = flow.mode === 'sale' ? 'Confirm sale' : 'Confirm restock'; }
+    return;
+  }
+
+  const amount = flow.mode === 'sale' ? s.sellPrice * flow.qty : 0;
   const body = document.getElementById('flowBody');
   document.getElementById('flowTitle').textContent = flow.mode === 'sale' ? 'Sale recorded' : 'Restock recorded';
   body.innerHTML = `
     <div class="confirm-screen">
       <div class="confirm-icon">${checkIcon}</div>
       <div class="confirm-title">${flow.mode === 'sale' ? 'Sale recorded' : 'Stock added'}</div>
-      <div class="confirm-sub">${flow.qty} &times; ${flow.item.name} (${s.label})${flow.mode==='sale' ? ' &middot; ' + fmtBirr(txn.amount) : ''}</div>
+      <div class="confirm-sub">${flow.qty} &times; ${flow.item.name} (${s.label})${flow.mode==='sale' ? ' &middot; ' + fmtBirr(amount) : ''}</div>
       <div class="confirm-actions">
         <button id="doneBtn">Done</button>
         <button class="primary" id="anotherBtn">${flow.mode === 'sale' ? 'Record another sale' : 'Restock another'}</button>
@@ -455,30 +451,20 @@ function renderHistory(){
   });
 }
 
-function deleteTransaction(txnId){
+async function deleteTransaction(txnId){
   const txn = state.transactions.find(t => t.id === txnId);
   if(!txn) return;
-
-  const item = state.items.find(i => i.id === txn.itemId);
-  const size = item && (item.sizes.find(s => s.id === txn.sizeId) || item.sizes.find(s => s.label === txn.sizeLabel));
 
   const verb = txn.type === 'sale' ? 'sale' : 'restock';
   const confirmMsg = `Delete this ${verb} of ${txn.qty} \u00d7 ${txn.itemName} (${txn.sizeLabel})? This will also reverse its effect on stock.`;
   if(!confirm(confirmMsg)) return;
 
-  if(size){
-    if(txn.type === 'sale'){
-      size.qty += txn.qty; // give the stock back
-    }else{
-      size.qty = Math.max(0, size.qty - txn.qty); // remove what was added, never below 0
-    }
+  try{
+    await cloudDeleteTransaction(txn);
+    showToast('Transaction deleted.');
+  }catch(e){
+    showToast('Could not delete — check your internet connection.');
   }
-
-  state.transactions = state.transactions.filter(t => t.id !== txnId);
-  Store.save(state);
-  showToast('Transaction deleted.');
-  renderHistory();
-  updateLowStockUI();
 }
 
 document.querySelectorAll('#historySegmented .seg-btn').forEach(btn=>{
@@ -555,6 +541,7 @@ function renderSettings(){
   <div class="settings-section">
     <div class="settings-title">Account</div>
     <button class="full" id="logoutBtn">Log out</button>
+    <button class="full" id="forgetDeviceBtn" style="border-color:var(--danger);color:var(--danger);margin-top:8px;">Forget this device's login</button>
   </div>
   <div class="settings-section">
     <div class="settings-title">Data</div>
@@ -563,50 +550,69 @@ function renderSettings(){
   wrap.innerHTML = html;
 
   wrap.querySelectorAll('[data-price-item]').forEach(inp=>{
-    inp.addEventListener('change', ()=>{
+    inp.addEventListener('change', async ()=>{
       const id = inp.dataset.priceItem;
       const val = Math.max(0, Number(inp.value) || 0);
       const item = state.items.find(i=>i.id===id);
-      item.sizes.forEach(s => s.sellPrice = val);
-      Store.save(state);
-      showToast('Price updated for ' + item.name);
+      const threshold = item.sizes[0] ? item.sizes[0].threshold : DEFAULT_THRESHOLD;
+      try{
+        await cloudUpdateItemPricing(id, val, threshold);
+        showToast('Price updated for ' + item.name);
+      }catch(e){
+        showToast('Could not save — check your internet connection.');
+      }
     });
   });
   wrap.querySelectorAll('[data-threshold-item]').forEach(inp=>{
-    inp.addEventListener('change', ()=>{
+    inp.addEventListener('change', async ()=>{
       const id = inp.dataset.thresholdItem;
       const val = Math.max(0, Number(inp.value) || 0);
       const item = state.items.find(i=>i.id===id);
-      item.sizes.forEach(s => s.threshold = val);
-      Store.save(state);
-      showToast('Alert threshold updated for ' + item.name);
-      updateLowStockUI();
+      const price = item.sizes[0] ? item.sizes[0].sellPrice : 0;
+      try{
+        await cloudUpdateItemPricing(id, price, val);
+        showToast('Alert threshold updated for ' + item.name);
+        updateLowStockUI();
+      }catch(e){
+        showToast('Could not save — check your internet connection.');
+      }
     });
   });
   document.getElementById('logoutBtn').addEventListener('click', ()=>{
     if(typeof logOut === 'function') logOut();
   });
-  document.getElementById('resetBarcodesBtn').addEventListener('click', ()=>{
-    if(confirm('This unlinks every scanned barcode. You\'ll need to link them again next time you scan. Continue?')){
-      state.barcodeMap = {};
-      Store.save(state);
-      showToast('All barcode links removed.');
-      renderSettings();
+  document.getElementById('forgetDeviceBtn').addEventListener('click', ()=>{
+    if(confirm('This removes the saved admin login from this phone only. The shop\'s stock data is not affected, and other devices keep working normally. You\'ll need to set up a new login (or someone else\'s) to use the app on this phone again. Continue?')){
+      if(typeof clearAuth === 'function') clearAuth();
+      showToast('Login removed from this device.');
+      location.reload();
     }
   });
-  document.getElementById('resetBtn').addEventListener('click', ()=>{
-    if(confirm('This clears all stock counts and sales history. This cannot be undone. Continue?')){
-      state = buildDefaultState();
-      Store.save(state);
-      showToast('All data reset.');
-      showScreen('stock');
+  document.getElementById('resetBarcodesBtn').addEventListener('click', async ()=>{
+    if(confirm('This unlinks every scanned barcode. You\'ll need to link them again next time you scan. Continue?')){
+      try{
+        await cloudResetBarcodes();
+        showToast('All barcode links removed.');
+        renderSettings();
+      }catch(e){
+        showToast('Could not reset — check your internet connection.');
+      }
+    }
+  });
+  document.getElementById('resetBtn').addEventListener('click', async ()=>{
+    if(confirm('This clears all stock counts and sales history for everyone using this app. This cannot be undone. Continue?')){
+      try{
+        await cloudResetAll();
+        showToast('All data reset.');
+        showScreen('stock');
+      }catch(e){
+        showToast('Could not reset — check your internet connection.');
+      }
     }
   });
 }
 
 /* ---------- init ---------- */
-renderStock();
-
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
     navigator.serviceWorker.register('sw.js').catch(()=>{});

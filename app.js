@@ -3,15 +3,20 @@ let expandedItemId = null;
 let flow = null; // {mode:'sale'|'restock', item, size, qty}
 
 /* ---------- icons ---------- */
-function iconSvg(name){
-  const icons = {
-    shirt: '<path d="M8.5 3.5 L4 6.5 L6.2 9.7 L8.5 8.2 V20.5 H15.5 V8.2 L17.8 9.7 L20 6.5 L15.5 3.5 Q14.3 5.6 12 5.6 Q9.7 5.6 8.5 3.5 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>',
-    trouser: '<path d="M7 3.5 H17 L17.8 20.5 H13.6 L12 11.5 L10.4 20.5 H6.2 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><line x1="7.15" y1="6.3" x2="16.85" y2="6.3" stroke="currentColor" stroke-width="1.5"/>',
-    sweater: '<path d="M8 3.6 L3.8 6.3 L5.9 9.6 L8 8.3 V20.4 H16 V8.3 L18.1 9.6 L20.2 6.3 L16 3.6 Q14.6 6.1 12 6.1 Q9.4 6.1 8 3.6 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><path d="M9.6 3.9 Q10.6 5 12 5 Q13.4 5 14.4 3.9" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-    coat: '<path d="M8.2 3.6 L4 6.3 L6.1 9.5 L8.2 8.2 V21 H10.6 L12 15.5 L13.4 21 H15.8 V8.2 L17.9 9.5 L20 6.3 L15.8 3.6 L12 6.6 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><line x1="10.6" y1="9" x2="10.6" y2="15" stroke="currentColor" stroke-width="1.2"/>',
-    shoe: '<path d="M3.5 17.2 Q3.3 14.6 6 13.9 L9.3 13 L12.6 9 Q13.6 7.7 15 8.4 L15.6 9.9 Q17.6 10.4 19.3 12.5 Q20.9 14.4 20.4 17.2 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><line x1="9.3" y1="13" x2="9.3" y2="17.2" stroke="currentColor" stroke-width="1.3"/>'
+function itemEmoji(key){
+  const emoji = {
+    tshirt: '👕',
+    shirt: '👔',
+    trouser: '👖',
+    sweater: '🧶',
+    coat: '🧥',
+    shoe: '👟'
   };
-  return `<svg viewBox="0 0 24 24" width="20" height="20">${icons[name]||icons.shirt}</svg>`;
+  return emoji[key] || '🛍️';
+}
+function iconBadge(item){
+  const grad = item.color ? `background:linear-gradient(155deg, ${item.color[0]}, ${item.color[1]});` : '';
+  return `<div class="item-icon" style="${grad}">${itemEmoji(item.icon)}</div>`;
 }
 const checkIcon = '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M4 12.5 L9.5 18 L20 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const chevronIcon = '<svg class="chevron" viewBox="0 0 24 24" width="18" height="18"><path d="M6 9 L12 15 L18 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -59,6 +64,9 @@ document.getElementById('lowStockBtn').addEventListener('click', ()=>{
 });
 document.getElementById('lowStockBanner').addEventListener('click', ()=>{
   showScreen('stock');
+});
+document.getElementById('scanBtn').addEventListener('click', ()=>{
+  if(typeof openScanner === 'function') openScanner(handleScannedCode);
 });
 
 /* ---------- STOCK SCREEN ---------- */
@@ -109,7 +117,7 @@ function renderStock(){
     const low = hasLowStock(item);
     card.innerHTML = `
       <div class="row">
-        <div class="item-icon">${iconSvg(item.icon)}</div>
+        ${iconBadge(item)}
         <div class="item-info">
           <div class="item-name">${item.name}</div>
           <div class="item-sub">${totalQty(item)} in stock</div>
@@ -172,6 +180,32 @@ function startFlow(mode, presetItem){
   renderFlow();
 }
 
+function handleScannedCode(code){
+  // If no flow is active yet (scanned from the top bar), default to recording a sale
+  if(!flow){
+    flow = { mode: 'sale', item: null, size: null, qty: 1 };
+  }
+  const mapped = state.barcodeMap && state.barcodeMap[code];
+  if(mapped){
+    const item = state.items.find(i => i.id === mapped.itemId);
+    const size = item && item.sizes.find(s => s.id === mapped.sizeId);
+    if(item && size){
+      flow.item = item;
+      flow.size = size;
+      flow.qty = 1;
+      flow.linkingBarcode = null;
+      renderFlow();
+      showToast('Scanned: ' + item.name + ' · ' + size.label);
+      return;
+    }
+  }
+  // Unknown barcode — ask which item/size to link it to
+  flow.linkingBarcode = code;
+  flow.item = null;
+  flow.size = null;
+  renderFlow();
+}
+
 function renderFlow(){
   // Ensure the flow screen is visible (it's not part of bottom nav)
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -182,13 +216,29 @@ function renderFlow(){
   const title = document.getElementById('flowTitle');
 
   if(!flow.item){
-    title.textContent = flow.mode === 'sale' ? 'Record a sale' : 'Restock item';
-    body.innerHTML = `<div class="step-label">Which item?</div><div class="pick-grid" id="pickItems"></div>`;
+    title.textContent = flow.linkingBarcode
+      ? 'New barcode — link it'
+      : (flow.mode === 'sale' ? 'Record a sale' : 'Restock item');
+    const linkNote = flow.linkingBarcode
+      ? `<div class="link-note">This barcode isn't linked yet. Choose the item it belongs to — you'll only need to do this once.</div>`
+      : '';
+    body.innerHTML = `
+      ${linkNote}
+      <button class="scan-btn full" id="scanFromFlow">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 8 V5.5 Q4 4 5.5 4 H8 M16 4 H18.5 Q20 4 20 5.5 V8 M20 16 V18.5 Q20 20 18.5 20 H16 M8 20 H5.5 Q4 20 4 18.5 V16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="6.5" y1="12" x2="17.5" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Scan barcode
+      </button>
+      <div class="step-label" style="margin-top:18px;">Or pick the item</div>
+      <div class="pick-grid" id="pickItems"></div>
+    `;
+    document.getElementById('scanFromFlow').addEventListener('click', ()=>{
+      if(typeof openScanner === 'function') openScanner(handleScannedCode);
+    });
     const g = document.getElementById('pickItems');
     state.items.forEach(item=>{
       const c = document.createElement('div');
       c.className = 'pick-card';
-      c.innerHTML = `<div class="item-icon">${iconSvg(item.icon)}</div><div class="pick-card-label">${item.name}</div>`;
+      c.innerHTML = `${iconBadge(item)}<div class="pick-card-label">${item.name}</div>`;
       c.addEventListener('click', ()=>{ flow.item = item; renderFlow(); });
       g.appendChild(c);
     });
@@ -209,6 +259,13 @@ function renderFlow(){
           showToast('No stock left for this size.');
           return;
         }
+        if(flow.linkingBarcode){
+          if(!state.barcodeMap) state.barcodeMap = {};
+          state.barcodeMap[flow.linkingBarcode] = { itemId: flow.item.id, sizeId: sz.id };
+          Store.save(state);
+          showToast('Barcode linked to ' + flow.item.name + ' · ' + sz.label);
+          flow.linkingBarcode = null;
+        }
         flow.size = sz;
         flow.qty = 1;
         renderFlow();
@@ -224,7 +281,7 @@ function renderFlow(){
   const unitLabel = flow.mode === 'sale' ? 'sold' : 'to add';
   body.innerHTML = `
     <div class="summary-card">
-      <div class="item-icon">${iconSvg(flow.item.icon)}</div>
+      ${iconBadge(flow.item)}
       <div>
         <div class="item-name">${flow.item.name} &middot; ${s.label}</div>
         <div class="item-sub">${s.qty} currently in stock</div>
@@ -290,6 +347,7 @@ function confirmFlow(){
     id: uid(),
     itemId: flow.item.id,
     itemName: flow.item.name,
+    sizeId: s.id,
     sizeLabel: s.label,
     type: flow.mode,
     qty: flow.qty,
@@ -385,9 +443,42 @@ function renderHistory(){
           <div class="hist-meta">${dateStr}</div>
         </div>
         <div class="hist-amt">${t.qty} unit${t.qty>1?'s':''}${t.type==='sale' ? ' &middot; ' + fmtBirr(t.amount) : ''}</div>
+        <button class="hist-delete" data-txn="${t.id}" aria-label="Delete transaction">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 7 H19 M9 7 V4.5 Q9 3.5 10 3.5 H14 Q15 3.5 15 4.5 V7 M7 7 L7.8 19 Q7.9 20 9 20 H15 Q16.1 20 16.2 19 L17 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
       </div>
     `;
   }).join('');
+
+  list.querySelectorAll('.hist-delete').forEach(btn=>{
+    btn.addEventListener('click', ()=> deleteTransaction(btn.dataset.txn));
+  });
+}
+
+function deleteTransaction(txnId){
+  const txn = state.transactions.find(t => t.id === txnId);
+  if(!txn) return;
+
+  const item = state.items.find(i => i.id === txn.itemId);
+  const size = item && (item.sizes.find(s => s.id === txn.sizeId) || item.sizes.find(s => s.label === txn.sizeLabel));
+
+  const verb = txn.type === 'sale' ? 'sale' : 'restock';
+  const confirmMsg = `Delete this ${verb} of ${txn.qty} \u00d7 ${txn.itemName} (${txn.sizeLabel})? This will also reverse its effect on stock.`;
+  if(!confirm(confirmMsg)) return;
+
+  if(size){
+    if(txn.type === 'sale'){
+      size.qty += txn.qty; // give the stock back
+    }else{
+      size.qty = Math.max(0, size.qty - txn.qty); // remove what was added, never below 0
+    }
+  }
+
+  state.transactions = state.transactions.filter(t => t.id !== txnId);
+  Store.save(state);
+  showToast('Transaction deleted.');
+  renderHistory();
+  updateLowStockUI();
 }
 
 document.querySelectorAll('#historySegmented .seg-btn').forEach(btn=>{
@@ -452,6 +543,16 @@ function renderSettings(){
   });
   html += `</div>
   <div class="settings-section">
+    <div class="settings-title">Barcodes</div>
+    <div class="settings-item-row">
+      <div class="row">
+        <div class="item-name">Linked barcodes</div>
+        <div class="item-sub">${Object.keys(state.barcodeMap||{}).length} linked</div>
+      </div>
+    </div>
+    <button class="full" id="resetBarcodesBtn" style="border-color:var(--danger);color:var(--danger);">Unlink all barcodes</button>
+  </div>
+  <div class="settings-section">
     <div class="settings-title">Account</div>
     <button class="full" id="logoutBtn">Log out</button>
   </div>
@@ -484,6 +585,14 @@ function renderSettings(){
   });
   document.getElementById('logoutBtn').addEventListener('click', ()=>{
     if(typeof logOut === 'function') logOut();
+  });
+  document.getElementById('resetBarcodesBtn').addEventListener('click', ()=>{
+    if(confirm('This unlinks every scanned barcode. You\'ll need to link them again next time you scan. Continue?')){
+      state.barcodeMap = {};
+      Store.save(state);
+      showToast('All barcode links removed.');
+      renderSettings();
+    }
   });
   document.getElementById('resetBtn').addEventListener('click', ()=>{
     if(confirm('This clears all stock counts and sales history. This cannot be undone. Continue?')){

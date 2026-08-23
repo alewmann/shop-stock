@@ -1,4 +1,4 @@
-const CACHE_NAME = 'shop-stock-v4';
+const CACHE_NAME = 'shop-stock-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -6,6 +6,7 @@ const ASSETS = [
   './data.js',
   './app.js',
   './auth.js',
+  './barcode.js',
   './manifest.json',
   './icon-192.png',
   './icon-512.png'

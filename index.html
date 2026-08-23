@@ -9,6 +9,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" defer></script>
 </head>
 <body>
 
@@ -67,6 +68,9 @@
       <div class="brand-badge">AB</div>
       <span class="brand">AB Collection</span>
     </div>
+    <button id="scanBtn" class="icon-btn" aria-label="Scan barcode">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 8 V5.5 Q4 4 5.5 4 H8 M16 4 H18.5 Q20 4 20 5.5 V8 M20 16 V18.5 Q20 20 18.5 20 H16 M8 20 H5.5 Q4 20 4 18.5 V16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="6.5" y1="12" x2="17.5" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
     <button id="lowStockBtn" class="icon-btn" aria-label="Low stock alerts">
       <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 2 L22 20 L2 20 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16.7" r="1" fill="currentColor"/></svg>
       <span id="lowStockDot" class="dot" hidden></span>
@@ -148,8 +152,19 @@
 
 <div id="toast" class="toast" hidden></div>
 
+<!-- SCANNER MODAL -->
+<div id="scannerModal" class="scanner-modal" hidden>
+  <div class="scanner-topbar">
+    <span class="scanner-title">Scan barcode</span>
+    <button id="scannerClose" class="scanner-close" aria-label="Close scanner">&times;</button>
+  </div>
+  <div id="scannerView" class="scanner-view"></div>
+  <div class="scanner-hint">Point the camera at the tag's barcode</div>
+</div>
+
 <script src="data.js"></script>
 <script src="app.js"></script>
 <script src="auth.js"></script>
+<script src="barcode.js"></script>
 </body>
 </html>

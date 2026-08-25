@@ -244,7 +244,9 @@ function renderFlow(){
     return;
   }
 
-  if(!flow.size){
+  const needsSizePicker = flow.mode === 'sale' || flow.linkingBarcode;
+
+  if(!flow.size && needsSizePicker){
     title.textContent = flow.item.name;
     body.innerHTML = `<div class="step-label">Which size?</div><div class="pick-grid sizes" id="pickSizes"></div>`;
     const g = document.getElementById('pickSizes');
@@ -277,10 +279,20 @@ function renderFlow(){
     return;
   }
 
-  // Step 3: quantity + confirm
+  if(!flow.size && flow.mode === 'restock'){
+    renderBulkRestock();
+    return;
+  }
+
+  if(flow.mode === 'restock'){
+    renderRestockSingleQty();
+    return;
+  }
+
+  // Step 3 (sale only): quantity stepper + confirm
   title.textContent = 'Confirm';
   const s = flow.size;
-  const unitLabel = flow.mode === 'sale' ? 'sold' : 'to add';
+  const unitLabel = 'sold';
   body.innerHTML = `
     <div class="summary-card">
       ${iconBadge(flow.item)}
@@ -295,27 +307,133 @@ function renderFlow(){
       <span class="qty-val" id="qtyVal">${flow.qty}</span>
       <button class="qty-btn" id="qtyPlus">&plus;</button>
     </div>
-    ${flow.mode === 'sale' ? `
     <div class="total-row">
       <span class="total-label">Total</span>
       <span class="total-val" id="totalVal">${fmtBirr(s.sellPrice * flow.qty)}</span>
-    </div>` : ''}
+    </div>
     <div id="flowError" class="error-text" style="display:none;"></div>
-    <button class="${flow.mode==='sale' ? 'primary' : 'accent'} full" id="confirmBtn">
-      ${flow.mode === 'sale' ? 'Confirm sale' : 'Confirm restock'}
-    </button>
+    <button class="primary full" id="confirmBtn">Confirm sale</button>
   `;
 
   document.getElementById('qtyMinus').addEventListener('click', ()=>{
     if(flow.qty > 1){ flow.qty--; updateQtyUI(); }
   });
   document.getElementById('qtyPlus').addEventListener('click', ()=>{
-    if(flow.mode === 'sale' && flow.qty >= s.qty){
+    if(flow.qty >= s.qty){
       showToast('Only ' + s.qty + ' in stock.');
       return;
     }
     flow.qty++; updateQtyUI();
   });
+  document.getElementById('confirmBtn').addEventListener('click', confirmFlow);
+}
+
+/* ---------- Restock: fill every size at once, typed numbers ---------- */
+function renderBulkRestock(){
+  const title = document.getElementById('flowTitle');
+  const body = document.getElementById('flowBody');
+  title.textContent = flow.item.name + ' — restock';
+
+  let rows = '';
+  flow.item.sizes.forEach(sz=>{
+    rows += `
+      <div class="bulk-size-row">
+        <div class="bulk-size-label">${sz.label}</div>
+        <div class="bulk-size-current">${sz.qty} in stock</div>
+        <input type="number" min="0" step="1" inputmode="numeric" class="bulk-size-input" data-size-label="${sz.label}" placeholder="0">
+      </div>`;
+  });
+
+  body.innerHTML = `
+    <div class="step-label">Enter quantity to add for each size</div>
+    <div class="bulk-size-list">${rows}</div>
+    <div id="flowError" class="error-text" style="display:none;"></div>
+    <button class="accent full" id="bulkConfirmBtn">Confirm restock</button>
+  `;
+  document.getElementById('bulkConfirmBtn').addEventListener('click', confirmBulkRestock);
+}
+
+async function confirmBulkRestock(){
+  const body = document.getElementById('flowBody');
+  const errEl = document.getElementById('flowError');
+  const inputs = document.querySelectorAll('.bulk-size-input');
+  const entries = [];
+  inputs.forEach(inp=>{
+    const val = Math.floor(Number(inp.value) || 0);
+    if(val > 0){
+      const size = flow.item.sizes.find(s=>s.label === inp.dataset.sizeLabel);
+      entries.push({ size, qty: val });
+    }
+  });
+
+  if(entries.length === 0){
+    errEl.style.display = 'block';
+    errEl.textContent = 'Enter a quantity for at least one size.';
+    return;
+  }
+  errEl.style.display = 'none';
+  const btn = document.getElementById('bulkConfirmBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  try{
+    for(const entry of entries){
+      await cloudRecordTransaction(flow.item, entry.size, 'restock', entry.qty);
+    }
+  }catch(e){
+    errEl.style.display = 'block';
+    errEl.textContent = 'Could not save — check your internet connection and try again.';
+    btn.disabled = false;
+    btn.textContent = 'Confirm restock';
+    return;
+  }
+
+  const summary = entries.map(e => e.size.label + ' ×' + e.qty).join(', ');
+  const totalUnits = entries.reduce((sum,e) => sum + e.qty, 0);
+  document.getElementById('flowTitle').textContent = 'Restock recorded';
+  body.innerHTML = `
+    <div class="confirm-screen">
+      <div class="confirm-icon">${checkIcon}</div>
+      <div class="confirm-title">Stock added</div>
+      <div class="confirm-sub">${flow.item.name}: ${summary} &middot; ${totalUnits} unit${totalUnits>1?'s':''} total</div>
+      <div class="confirm-actions">
+        <button id="doneBtn">Done</button>
+        <button class="primary" id="anotherBtn">Restock another item</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('doneBtn').addEventListener('click', ()=>{
+    expandedItemId = null;
+    showScreen('stock');
+  });
+  document.getElementById('anotherBtn').addEventListener('click', ()=>{
+    startFlow('restock');
+  });
+}
+
+/* ---------- Restock: single size (e.g. via barcode scan), typed number ---------- */
+function renderRestockSingleQty(){
+  const title = document.getElementById('flowTitle');
+  const body = document.getElementById('flowBody');
+  title.textContent = 'Confirm';
+  const s = flow.size;
+  body.innerHTML = `
+    <div class="summary-card">
+      ${iconBadge(flow.item)}
+      <div>
+        <div class="item-name">${flow.item.name} &middot; ${s.label}</div>
+        <div class="item-sub">${s.qty} currently in stock</div>
+      </div>
+    </div>
+    <div class="step-label">Quantity to add</div>
+    <div class="field-row">
+      <input type="number" min="1" step="1" inputmode="numeric" id="restockQtyInput" placeholder="0">
+    </div>
+    <div id="flowError" class="error-text" style="display:none;"></div>
+    <button class="accent full" id="confirmBtn">Confirm restock</button>
+  `;
+  const input = document.getElementById('restockQtyInput');
+  input.addEventListener('input', ()=>{ flow.qty = Math.floor(Number(input.value) || 0); });
   document.getElementById('confirmBtn').addEventListener('click', confirmFlow);
 }
 
@@ -507,25 +625,46 @@ document.getElementById('exportBtn').addEventListener('click', ()=>{
 });
 
 /* ---------- SETTINGS SCREEN ---------- */
+let expandedSettingsItemId = null;
+
 function renderSettings(){
   const wrap = document.getElementById('settingsList');
   let html = `<div class="settings-section">
-    <div class="settings-title">Items &amp; pricing</div>`;
+    <div class="settings-title">Items &amp; pricing</div>
+    <div class="settings-hint">Tap an item to set the price and low-stock alert for each size individually.</div>`;
   state.items.forEach(item=>{
-    html += `<div class="settings-item-row" data-item="${item.id}">
-      <div class="row">
-        <div class="item-name">${item.name}</div>
-        <div class="item-sub">${item.sizes.length} sizes</div>
-      </div>
-      <div class="mini-field">
-        <label>Price per unit</label>
-        <input type="number" min="0" step="1" data-price-item="${item.id}" value="${item.sizes[0].sellPrice}">
-      </div>
-      <div class="mini-field">
-        <label>Low-stock alert below</label>
-        <input type="number" min="0" step="1" data-threshold-item="${item.id}" value="${item.sizes[0].threshold}">
-      </div>
-    </div>`;
+    const expanded = expandedSettingsItemId === item.id;
+    const prices = item.sizes.map(s=>s.sellPrice);
+    const priceLabel = (Math.min(...prices) === Math.max(...prices))
+      ? fmtBirr(prices[0])
+      : fmtBirr(Math.min(...prices)) + '–' + fmtBirr(Math.max(...prices));
+    html += `<div class="settings-item-row settings-item-expandable ${expanded ? 'expanded' : ''}" data-settings-item="${item.id}">
+      <div class="row" style="cursor:pointer;">
+        <div>
+          <div class="item-name">${item.name}</div>
+          <div class="item-sub">${item.sizes.length} sizes &middot; ${priceLabel}</div>
+        </div>
+        ${chevronIcon}
+      </div>`;
+    if(expanded){
+      html += `<div class="size-price-list">`;
+      item.sizes.forEach(s=>{
+        html += `
+          <div class="size-price-row">
+            <span class="size-price-label">${s.label}</span>
+            <div class="mini-field">
+              <label>Price</label>
+              <input type="number" min="0" step="1" data-price-size="${item.id}|${s.label}" value="${s.sellPrice}">
+            </div>
+            <div class="mini-field">
+              <label>Alert below</label>
+              <input type="number" min="0" step="1" data-threshold-size="${item.id}|${s.label}" value="${s.threshold}">
+            </div>
+          </div>`;
+      });
+      html += `</div>`;
+    }
+    html += `</div>`;
   });
   html += `</div>
   <div class="settings-section">
@@ -549,29 +688,37 @@ function renderSettings(){
   </div>`;
   wrap.innerHTML = html;
 
-  wrap.querySelectorAll('[data-price-item]').forEach(inp=>{
+  wrap.querySelectorAll('[data-settings-item]').forEach(row=>{
+    row.querySelector('.row').addEventListener('click', ()=>{
+      const id = row.dataset.settingsItem;
+      expandedSettingsItemId = expandedSettingsItemId === id ? null : id;
+      renderSettings();
+    });
+  });
+
+  wrap.querySelectorAll('[data-price-size]').forEach(inp=>{
     inp.addEventListener('change', async ()=>{
-      const id = inp.dataset.priceItem;
+      const [itemId, label] = inp.dataset.priceSize.split('|');
       const val = Math.max(0, Number(inp.value) || 0);
-      const item = state.items.find(i=>i.id===id);
-      const threshold = item.sizes[0] ? item.sizes[0].threshold : DEFAULT_THRESHOLD;
+      const item = state.items.find(i=>i.id===itemId);
+      const size = item.sizes.find(s=>s.label===label);
       try{
-        await cloudUpdateItemPricing(id, val, threshold);
-        showToast('Price updated for ' + item.name);
+        await cloudUpdateSizePricing(itemId, label, val, size.threshold);
+        showToast('Price updated for ' + item.name + ' · ' + label);
       }catch(e){
         showToast('Could not save — check your internet connection.');
       }
     });
   });
-  wrap.querySelectorAll('[data-threshold-item]').forEach(inp=>{
+  wrap.querySelectorAll('[data-threshold-size]').forEach(inp=>{
     inp.addEventListener('change', async ()=>{
-      const id = inp.dataset.thresholdItem;
+      const [itemId, label] = inp.dataset.thresholdSize.split('|');
       const val = Math.max(0, Number(inp.value) || 0);
-      const item = state.items.find(i=>i.id===id);
-      const price = item.sizes[0] ? item.sizes[0].sellPrice : 0;
+      const item = state.items.find(i=>i.id===itemId);
+      const size = item.sizes.find(s=>s.label===label);
       try{
-        await cloudUpdateItemPricing(id, price, val);
-        showToast('Alert threshold updated for ' + item.name);
+        await cloudUpdateSizePricing(itemId, label, size.sellPrice, val);
+        showToast('Alert threshold updated for ' + item.name + ' · ' + label);
         updateLowStockUI();
       }catch(e){
         showToast('Could not save — check your internet connection.');

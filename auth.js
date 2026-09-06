@@ -1,5 +1,7 @@
-const AUTH_KEY = 'shopstock_auth_v1';
-const SESSION_KEY = 'shopstock_session_v1';
+const SESSION_KEY = 'shopstock_session_v2';
+const ROLE_KEY = 'shopstock_role_v2';
+const SESSION_ID_KEY = 'shopstock_device_session_id_v1';
+const DISPLAY_NAME_KEY = 'shopstock_display_name_v1';
 
 async function sha256(text){
   const enc = new TextEncoder().encode(text);
@@ -7,52 +9,87 @@ async function sha256(text){
   return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
-function getAuth(){
+function getOrCreateSessionId(){
+  let id = sessionStorage.getItem(SESSION_ID_KEY);
+  if(!id){
+    id = 'sess_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+    sessionStorage.setItem(SESSION_ID_KEY, id);
+  }
+  return id;
+}
+
+function rememberDisplayName(name){
+  try{ localStorage.setItem(DISPLAY_NAME_KEY, name); }catch(e){}
+}
+function getRememberedDisplayName(){
+  try{ return localStorage.getItem(DISPLAY_NAME_KEY) || ''; }catch(e){ return ''; }
+}
+
+async function startSessionTracking(role, label){
+  const sessionId = getOrCreateSessionId();
   try{
-    const raw = localStorage.getItem(AUTH_KEY);
-    return raw ? JSON.parse(raw) : null;
-  }catch(e){ return null; }
+    await cloudRegisterSession(sessionId, role, label);
+    watchOwnSession(sessionId, ()=>{
+      showToast('You have been logged out by the admin.');
+      setTimeout(()=> logOut(true), 900);
+    });
+  }catch(e){ /* offline — session tracking just won't be visible to admin until reconnected */ }
 }
-function setAuth(username, passHash){
-  localStorage.setItem(AUTH_KEY, JSON.stringify({ username, passHash }));
-}
-function clearAuth(){
-  localStorage.removeItem(AUTH_KEY);
-  localStorage.removeItem(SESSION_KEY);
-}
+
 function isLoggedIn(){
   return sessionStorage.getItem(SESSION_KEY) === '1';
 }
-function setLoggedIn(){
-  sessionStorage.setItem(SESSION_KEY, '1');
+function getRole(){
+  return sessionStorage.getItem(ROLE_KEY) || null;
 }
-function logOut(){
+function setLoggedIn(role){
+  sessionStorage.setItem(SESSION_KEY, '1');
+  sessionStorage.setItem(ROLE_KEY, role);
+}
+function logOut(skipRevoke){
+  if(!skipRevoke){
+    try{ cloudRevokeSession(getOrCreateSessionId()); }catch(e){}
+  }
   sessionStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(ROLE_KEY);
+  sessionStorage.removeItem(SESSION_ID_KEY);
   location.reload();
 }
+// Clears any leftover credentials from the old per-device login system
+// (before admin/staff accounts moved to the shared database).
+function clearAuth(){
+  try{ localStorage.removeItem('shopstock_auth_v1'); }catch(e){}
+  logOut();
+}
 
-function showAuthScreen(){
+async function showAuthScreen(){
   document.getElementById('authScreen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
 
-  const existing = getAuth();
   const setupBlock = document.getElementById('authSetup');
   const loginBlock = document.getElementById('authLogin');
+  setupBlock.style.display = 'none';
+  loginBlock.style.display = 'none';
 
-  if(!existing){
+  const config = await getAccessConfig();
+  if(!config || !config.adminPasswordHash){
     setupBlock.style.display = 'block';
-    loginBlock.style.display = 'none';
   }else{
-    setupBlock.style.display = 'none';
     loginBlock.style.display = 'block';
-    setTimeout(()=> document.getElementById('loginUser').focus(), 50);
+    setTimeout(()=> {
+      const el = document.getElementById('loginUser');
+      if(el) el.focus();
+      if(typeof positionSegPill === 'function') positionSegPill(document.getElementById('loginRoleToggle'));
+    }, 50);
   }
 }
 
-function enterApp(){
+function enterApp(role, label){
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
+  if(typeof applyRoleRestrictions === 'function') applyRoleRestrictions(role);
   if(typeof renderStock === 'function') renderStock();
+  startSessionTracking(role, label || getRememberedDisplayName());
 }
 
 document.getElementById('setupBtn').addEventListener('click', async ()=>{
@@ -78,29 +115,75 @@ document.getElementById('setupBtn').addEventListener('click', async ()=>{
   }
   err.style.display = 'none';
   const hash = await sha256(pass);
-  setAuth(user, hash);
-  setLoggedIn();
-  enterApp();
+  try{
+    await cloudSaveAdminAccess(user, hash);
+    rememberDisplayName(user);
+    setLoggedIn('admin');
+    enterApp('admin', user);
+  }catch(e){
+    err.style.display = 'block';
+    err.textContent = 'Could not save — check your internet connection and try again.';
+  }
+});
+
+/* ---------- login role toggle ---------- */
+let loginRole = 'admin';
+document.querySelectorAll('#loginRoleToggle .seg-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    if(typeof buzz === 'function') buzz(6);
+    document.querySelectorAll('#loginRoleToggle .seg-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    if(typeof positionSegPill === 'function') positionSegPill(document.getElementById('loginRoleToggle'));
+    loginRole = btn.dataset.role;
+    document.getElementById('loginUserRow').style.display = loginRole === 'admin' ? 'block' : 'none';
+    document.getElementById('loginNameRow').style.display = loginRole === 'staff' ? 'block' : 'none';
+    document.getElementById('loginPassLabel').textContent = loginRole === 'admin' ? 'Password' : 'Staff password';
+    document.getElementById('loginError').style.display = 'none';
+    if(loginRole === 'staff'){
+      const remembered = getRememberedDisplayName();
+      if(remembered) document.getElementById('loginName').value = remembered;
+    }
+  });
 });
 
 document.getElementById('loginBtn').addEventListener('click', async ()=>{
-  const user = document.getElementById('loginUser').value.trim();
   const pass = document.getElementById('loginPass').value;
   const err = document.getElementById('loginError');
-  const stored = getAuth();
+  err.style.display = 'none';
 
-  if(!stored){
-    showAuthScreen();
+  const config = await getAccessConfig();
+  if(!config){
+    err.style.display = 'block';
+    err.textContent = 'Could not connect — check your internet connection and try again.';
     return;
   }
   const hash = await sha256(pass);
-  if(user === stored.username && hash === stored.passHash){
-    err.style.display = 'none';
-    setLoggedIn();
-    enterApp();
-  }else{
+
+  if(loginRole === 'admin'){
+    const user = document.getElementById('loginUser').value.trim();
+    if(user === config.adminUsername && hash === config.adminPasswordHash){
+      rememberDisplayName(user);
+      setLoggedIn('admin');
+      enterApp('admin', user);
+      return;
+    }
     err.style.display = 'block';
     err.textContent = 'Incorrect username or password.';
+  }else{
+    const name = document.getElementById('loginName').value.trim();
+    if(!name){
+      err.style.display = 'block';
+      err.textContent = 'Please enter your name so the admin knows it\'s you.';
+      return;
+    }
+    if(config.staffPasswordHash && hash === config.staffPasswordHash){
+      rememberDisplayName(name);
+      setLoggedIn('staff');
+      enterApp('staff', name);
+      return;
+    }
+    err.style.display = 'block';
+    err.textContent = config.staffPasswordHash ? 'Incorrect staff password.' : 'Staff access has not been set up yet — ask the admin.';
   }
 });
 
@@ -116,11 +199,10 @@ document.getElementById('loginBtn').addEventListener('click', async ()=>{
 });
 
 /* ---------- init auth ---------- */
-(function initAuth(){
-  const stored = getAuth();
-  if(stored && isLoggedIn()){
-    enterApp();
+(async function initAuth(){
+  if(isLoggedIn()){
+    enterApp(getRole());
   }else{
-    showAuthScreen();
+    await showAuthScreen();
   }
 })();

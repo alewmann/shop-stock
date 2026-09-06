@@ -13,6 +13,8 @@
 </head>
 <body>
 
+<div class="bg-blobs"><div class="blob"></div></div>
+
 <!-- AUTH SCREEN (setup or login) -->
 <div id="authScreen" class="auth-wrap">
   <div class="auth-card">
@@ -25,7 +27,7 @@
     <!-- Setup mode (first run) -->
     <div id="authSetup" style="display:none;">
       <div class="auth-title">Set up admin access</div>
-      <div class="auth-sub">Create a username and password to protect this app.</div>
+      <div class="auth-sub">Create your admin username and password. You can set a separate staff password afterward in Settings.</div>
       <div class="field-row">
         <label class="field-label">Username</label>
         <input type="text" id="setupUser" autocomplete="username">
@@ -44,14 +46,23 @@
 
     <!-- Login mode -->
     <div id="authLogin" style="display:none;">
-      <div class="auth-title">Admin login</div>
+      <div class="auth-title">Log in</div>
       <div class="auth-sub">Enter your details to open the app.</div>
-      <div class="field-row">
+      <div class="segmented" id="loginRoleToggle" style="margin-bottom:16px;">
+        <div class="seg-pill"></div>
+        <button type="button" class="seg-btn active" data-role="admin">Admin</button>
+        <button type="button" class="seg-btn" data-role="staff">Staff</button>
+      </div>
+      <div class="field-row" id="loginUserRow">
         <label class="field-label">Username</label>
         <input type="text" id="loginUser" autocomplete="username">
       </div>
+      <div class="field-row" id="loginNameRow" style="display:none;">
+        <label class="field-label">Your name</label>
+        <input type="text" id="loginName" autocomplete="name" placeholder="So the admin knows it's you">
+      </div>
       <div class="field-row">
-        <label class="field-label">Password</label>
+        <label class="field-label" id="loginPassLabel">Password</label>
         <input type="password" id="loginPass" autocomplete="current-password">
       </div>
       <div id="loginError" class="error-text" style="display:none;"></div>
@@ -105,6 +116,7 @@
     <!-- HISTORY SCREEN -->
     <section id="screen-history" class="screen">
       <div class="segmented" id="historySegmented">
+        <div class="seg-pill"></div>
         <button class="seg-btn active" data-range="today">Today</button>
         <button class="seg-btn" data-range="week">Week</button>
         <button class="seg-btn" data-range="month">Month</button>
@@ -127,6 +139,7 @@
 
   <!-- Bottom nav -->
   <nav class="bottomnav">
+    <div class="nav-pill" id="navPill"></div>
     <button class="navbtn active" data-screen="stock">
       <svg viewBox="0 0 24 24" width="22" height="22"><rect x="3" y="3" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="3" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="3" y="13" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="13" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
       <span>Stock</span>

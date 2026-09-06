@@ -3,6 +3,90 @@ let state = { items: [], transactions: [], barcodeMap: {} };
 let db = null;
 let syncConnected = false;
 
+let _syncReadyResolve;
+const _syncReadyPromise = new Promise(res => { _syncReadyResolve = res; });
+function waitForSync(timeoutMs){
+  const timeout = new Promise((_, rej) => setTimeout(()=> rej(new Error('sync-timeout')), timeoutMs || 8000));
+  return Promise.race([_syncReadyPromise, timeout]);
+}
+
+const ACCESS_CACHE_KEY = 'shopstock_access_cache_v1';
+function cacheAccessConfig(data){
+  try{ localStorage.setItem(ACCESS_CACHE_KEY, JSON.stringify(data)); }catch(e){}
+}
+function readCachedAccessConfig(){
+  try{
+    const raw = localStorage.getItem(ACCESS_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+
+/* Reads the shared admin/staff credentials, falling back to a locally
+   cached copy if the shared database can't be reached right now. */
+async function getAccessConfig(){
+  try{
+    await waitForSync(5000);
+    const doc = await db.collection('config').doc('access').get();
+    const data = doc.exists ? doc.data() : null;
+    if(data) cacheAccessConfig(data);
+    return data;
+  }catch(e){
+    return readCachedAccessConfig();
+  }
+}
+
+async function cloudSaveAdminAccess(username, passHash){
+  await db.collection('config').doc('access').set({ adminUsername: username, adminPasswordHash: passHash }, { merge: true });
+  const cached = readCachedAccessConfig() || {};
+  cacheAccessConfig({ ...cached, adminUsername: username, adminPasswordHash: passHash });
+}
+
+async function cloudSaveStaffPassword(passHash){
+  await db.collection('config').doc('access').set({ staffPasswordHash: passHash }, { merge: true });
+  const cached = readCachedAccessConfig() || {};
+  cacheAccessConfig({ ...cached, staffPasswordHash: passHash });
+}
+
+/* ---------- device sessions (so admin can see & kick out logged-in devices) ---------- */
+
+async function cloudRegisterSession(sessionId, role, label){
+  await db.collection('sessions').doc(sessionId).set({
+    role,
+    label: label || null,
+    createdAt: Date.now()
+  });
+}
+
+async function cloudRenameSession(sessionId, label){
+  await db.collection('sessions').doc(sessionId).update({ label: label || null });
+}
+
+async function cloudRevokeSession(sessionId){
+  await db.collection('sessions').doc(sessionId).delete();
+}
+
+/* Watches this device's own session doc — if it's deleted (kicked out by
+   admin, or the device itself logged out from elsewhere), fires onRevoked(). */
+function watchOwnSession(sessionId, onRevoked){
+  return db.collection('sessions').doc(sessionId).onSnapshot(doc=>{
+    if(!doc.exists) onRevoked();
+  }, ()=>{ /* connection hiccup — ignore, don't force-logout on a blip */ });
+}
+
+let _sessionsListenerStarted = false;
+let sessionsList = [];
+function startSessionsListenerOnce(){
+  if(_sessionsListenerStarted || !db) return;
+  _sessionsListenerStarted = true;
+  db.collection('sessions').orderBy('createdAt','desc').onSnapshot(snap=>{
+    const rows = [];
+    snap.forEach(doc => rows.push({ id: doc.id, ...doc.data() }));
+    sessionsList = rows;
+    const settingsActive = document.getElementById('screen-settings') && document.getElementById('screen-settings').classList.contains('active');
+    if(settingsActive && typeof renderSettings === 'function') renderSettings();
+  });
+}
+
 function initSync(){
   try{
     firebase.initializeApp(firebaseConfig);
@@ -13,7 +97,8 @@ function initSync(){
       if(user){
         syncConnected = true;
         updateSyncBadge(true);
-        subscribeAll();
+        if(typeof _syncReadyResolve === 'function') _syncReadyResolve();
+        try{ subscribeAll(); }catch(e){ /* credential reads don't depend on these listeners */ }
       }
     });
     firebase.auth().signInAnonymously().catch(()=>{

@@ -1,5 +1,40 @@
 let expandedItemId = null;
 let flow = null; // {mode:'sale'|'restock', item, size, qty}
+let currentRole = 'admin';
+
+function isStaff(){ return currentRole === 'staff'; }
+
+function applyRoleRestrictions(role){
+  currentRole = role || 'admin';
+  document.querySelectorAll('.navbtn[data-action="new-restock"]').forEach(el=>{
+    el.style.display = isStaff() ? 'none' : '';
+  });
+  requestAnimationFrame(positionNavPill);
+}
+
+function positionNavPill(){
+  const pill = document.getElementById('navPill');
+  const nav = document.querySelector('.bottomnav');
+  if(!pill || !nav) return;
+  const activeBtn = nav.querySelector('.navbtn.active');
+  if(!activeBtn || activeBtn.offsetParent === null) return;
+  pill.style.left = activeBtn.offsetLeft + 'px';
+  pill.style.width = activeBtn.offsetWidth + 'px';
+}
+window.addEventListener('resize', ()=> requestAnimationFrame(positionNavPill));
+
+function positionSegPill(container){
+  if(!container) return;
+  const pill = container.querySelector('.seg-pill');
+  const activeBtn = container.querySelector('.seg-btn.active');
+  if(!pill || !activeBtn) return;
+  pill.style.left = activeBtn.offsetLeft + 'px';
+  pill.style.width = activeBtn.offsetWidth + 'px';
+}
+function positionAllSegPills(){
+  document.querySelectorAll('.segmented').forEach(el => positionSegPill(el));
+}
+window.addEventListener('resize', ()=> requestAnimationFrame(positionAllSegPills));
 
 /* ---------- icons ---------- */
 function itemEmoji(key){
@@ -40,19 +75,25 @@ function showToast(msg){
 function uid(){ return Math.random().toString(36).slice(2,10); }
 
 /* ---------- navigation ---------- */
+function buzz(ms){
+  try{ if(navigator.vibrate) navigator.vibrate(ms || 8); }catch(e){}
+}
+
 function showScreen(name){
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-'+name).classList.add('active');
   document.querySelectorAll('.navbtn').forEach(b=>{
     b.classList.toggle('active', b.dataset.screen === name);
   });
+  requestAnimationFrame(positionNavPill);
+  requestAnimationFrame(positionAllSegPills);
   if(name === 'stock') renderStock();
   if(name === 'history') renderHistory();
   if(name === 'settings') renderSettings();
 }
 
 document.querySelectorAll('.navbtn[data-screen]').forEach(btn=>{
-  btn.addEventListener('click', ()=> showScreen(btn.dataset.screen));
+  btn.addEventListener('click', ()=> { buzz(6); showScreen(btn.dataset.screen); });
 });
 document.querySelector('[data-action="new-sale"]').addEventListener('click', ()=> startFlow('sale'));
 document.querySelector('[data-action="new-restock"]').addEventListener('click', ()=> startFlow('restock'));
@@ -138,7 +179,7 @@ function renderStock(){
       actions.className = 'card-actions';
       actions.innerHTML = `
         <button class="primary" data-sale="${item.id}">Record sale</button>
-        <button data-restock="${item.id}">Restock</button>
+        ${isStaff() ? '' : `<button data-restock="${item.id}">Restock</button>`}
       `;
       card.appendChild(sizeList);
       card.appendChild(actions);
@@ -146,10 +187,13 @@ function renderStock(){
         e.stopPropagation();
         startFlow('sale', item);
       });
-      actions.querySelector('[data-restock]').addEventListener('click', e=>{
-        e.stopPropagation();
-        startFlow('restock', item);
-      });
+      const restockBtn = actions.querySelector('[data-restock]');
+      if(restockBtn){
+        restockBtn.addEventListener('click', e=>{
+          e.stopPropagation();
+          startFlow('restock', item);
+        });
+      }
     }
     card.addEventListener('click', ()=>{
       expandedItemId = expandedItemId === item.id ? null : item.id;
@@ -175,6 +219,10 @@ function updateLowStockUI(){
 
 /* ---------- SALE / RESTOCK FLOW ---------- */
 function startFlow(mode, presetItem){
+  if(mode === 'restock' && isStaff()){
+    showToast('Only the admin can restock.');
+    return;
+  }
   flow = { mode, item: presetItem || null, size: null, qty: 1 };
   renderFlow();
 }
@@ -390,6 +438,7 @@ async function confirmBulkRestock(){
 
   const summary = entries.map(e => e.size.label + ' ×' + e.qty).join(', ');
   const totalUnits = entries.reduce((sum,e) => sum + e.qty, 0);
+  buzz(14);
   document.getElementById('flowTitle').textContent = 'Restock recorded';
   body.innerHTML = `
     <div class="confirm-screen">
@@ -471,6 +520,7 @@ async function confirmFlow(){
   }
 
   const amount = flow.mode === 'sale' ? s.sellPrice * flow.qty : 0;
+  buzz(14);
   const body = document.getElementById('flowBody');
   document.getElementById('flowTitle').textContent = flow.mode === 'sale' ? 'Sale recorded' : 'Restock recorded';
   body.innerHTML = `
@@ -524,7 +574,8 @@ let historyRangeValue = 'today';
 function renderHistory(){
   const range = historyRangeValue;
   const start = rangeStart(range);
-  const txns = state.transactions.filter(t => t.timestamp >= start);
+  let txns = state.transactions.filter(t => t.timestamp >= start);
+  if(isStaff()) txns = txns.filter(t => t.type === 'sale'); // restock activity is admin-only
 
   const sales = txns.filter(t=>t.type==='sale');
   const revenue = sales.reduce((s,t)=>s+t.amount,0);
@@ -557,9 +608,10 @@ function renderHistory(){
           <div class="hist-meta">${dateStr}</div>
         </div>
         <div class="hist-amt">${t.qty} unit${t.qty>1?'s':''}${t.type==='sale' ? ' &middot; ' + fmtBirr(t.amount) : ''}</div>
+        ${isStaff() ? '' : `
         <button class="hist-delete" data-txn="${t.id}" aria-label="Delete transaction">
           <svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 7 H19 M9 7 V4.5 Q9 3.5 10 3.5 H14 Q15 3.5 15 4.5 V7 M7 7 L7.8 19 Q7.9 20 9 20 H15 Q16.1 20 16.2 19 L17 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
+        </button>`}
       </div>
     `;
   }).join('');
@@ -570,6 +622,10 @@ function renderHistory(){
 }
 
 async function deleteTransaction(txnId){
+  if(isStaff()){
+    showToast('Only the admin can delete transactions.');
+    return;
+  }
   const txn = state.transactions.find(t => t.id === txnId);
   if(!txn) return;
 
@@ -587,8 +643,10 @@ async function deleteTransaction(txnId){
 
 document.querySelectorAll('#historySegmented .seg-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
+    buzz(6);
     document.querySelectorAll('#historySegmented .seg-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
+    positionSegPill(document.getElementById('historySegmented'));
     historyRangeValue = btn.dataset.range;
     renderHistory();
   });
@@ -627,11 +685,64 @@ document.getElementById('exportBtn').addEventListener('click', ()=>{
 /* ---------- SETTINGS SCREEN ---------- */
 let expandedSettingsItemId = null;
 
+function relativeTimeAgo(ts){
+  const diffMs = Date.now() - ts;
+  const mins = Math.floor(diffMs / 60000);
+  if(mins < 1) return 'just now';
+  if(mins < 60) return mins + ' min ago';
+  const hrs = Math.floor(mins / 60);
+  if(hrs < 24) return hrs + ' hr' + (hrs>1?'s':'') + ' ago';
+  const days = Math.floor(hrs / 24);
+  return days + ' day' + (days>1?'s':'') + ' ago';
+}
+
+function renderDevicesList(){
+  const sessions = (typeof sessionsList !== 'undefined') ? sessionsList : [];
+  const myId = (typeof getOrCreateSessionId === 'function') ? getOrCreateSessionId() : null;
+  if(sessions.length === 0){
+    return `<div class="settings-item-row"><div class="item-sub">No active sessions yet.</div></div>`;
+  }
+  return sessions.map(s=>{
+    const isMe = s.id === myId;
+    const roleLabel = s.role === 'admin' ? 'Admin' : 'Staff';
+    const displayName = s.label ? s.label : roleLabel;
+    return `
+      <div class="settings-item-row">
+        <div class="row">
+          <div>
+            <div class="item-name">${displayName}${isMe ? ' (this device)' : ''}</div>
+            <div class="item-sub">${roleLabel} &middot; logged in ${relativeTimeAgo(s.createdAt)}</div>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="ghost" data-rename="${s.id}" data-current="${(s.label||'').replace(/"/g,'&quot;')}" aria-label="Rename device">Rename</button>
+            ${isMe ? '' : `<button class="ghost" style="color:var(--danger);" data-kick="${s.id}">Log out</button>`}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
 function renderSettings(){
   const wrap = document.getElementById('settingsList');
+
+  if(isStaff()){
+    wrap.innerHTML = `
+      <div class="settings-section">
+        <div class="settings-title">Account</div>
+        <div class="settings-hint">You're logged in as staff. Pricing, restock, deleting transactions, and other admin settings aren't shown here.</div>
+        <button class="full" id="logoutBtn">Log out</button>
+      </div>
+    `;
+    document.getElementById('logoutBtn').addEventListener('click', ()=>{
+      if(typeof logOut === 'function') logOut();
+    });
+    return;
+  }
+
   let html = `<div class="settings-section">
     <div class="settings-title">Items &amp; pricing</div>
     <div class="settings-hint">Tap an item to set the price and low-stock alert for each size individually.</div>`;
+  if(typeof startSessionsListenerOnce === 'function') startSessionsListenerOnce();
   state.items.forEach(item=>{
     const expanded = expandedSettingsItemId === item.id;
     const prices = item.sizes.map(s=>s.sellPrice);
@@ -678,9 +789,22 @@ function renderSettings(){
     <button class="full" id="resetBarcodesBtn" style="border-color:var(--danger);color:var(--danger);">Unlink all barcodes</button>
   </div>
   <div class="settings-section">
+    <div class="settings-title">Staff access</div>
+    <div class="settings-hint">Staff can view stock and record sales only — restock and settings stay admin-only. Share this password with employees.</div>
+    <div class="field-row">
+      <label class="field-label">Staff password</label>
+      <input type="password" id="staffPassInput" placeholder="Set or change staff password" autocomplete="new-password">
+    </div>
+    <button class="full" id="saveStaffPassBtn">Save staff password</button>
+  </div>
+  <div class="settings-section">
+    <div class="settings-title">Active devices</div>
+    <div class="settings-hint">Everyone currently logged in. Log out a device remotely if needed.</div>
+    ${renderDevicesList()}
+  </div>
+  <div class="settings-section">
     <div class="settings-title">Account</div>
     <button class="full" id="logoutBtn">Log out</button>
-    <button class="full" id="forgetDeviceBtn" style="border-color:var(--danger);color:var(--danger);margin-top:8px;">Forget this device's login</button>
   </div>
   <div class="settings-section">
     <div class="settings-title">Data</div>
@@ -725,15 +849,47 @@ function renderSettings(){
       }
     });
   });
+  document.getElementById('saveStaffPassBtn').addEventListener('click', async ()=>{
+    const val = document.getElementById('staffPassInput').value;
+    if(!val || val.length < 4){
+      showToast('Staff password should be at least 4 characters.');
+      return;
+    }
+    try{
+      const hash = await sha256(val);
+      await cloudSaveStaffPassword(hash);
+      document.getElementById('staffPassInput').value = '';
+      showToast('Staff password saved.');
+    }catch(e){
+      showToast('Could not save — check your internet connection.');
+    }
+  });
+  wrap.querySelectorAll('[data-kick]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!confirm('Log this device out now? It will be signed out immediately, even if it\'s mid-use.')) return;
+      try{
+        await cloudRevokeSession(btn.dataset.kick);
+        showToast('Device logged out.');
+      }catch(e){
+        showToast('Could not reach the shared database — try again.');
+      }
+    });
+  });
+  wrap.querySelectorAll('[data-rename]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const current = btn.dataset.current || '';
+      const name = prompt('Name for this device (e.g. the staff member\'s name):', current);
+      if(name === null) return; // cancelled
+      try{
+        await cloudRenameSession(btn.dataset.rename, name.trim());
+        showToast('Device renamed.');
+      }catch(e){
+        showToast('Could not reach the shared database — try again.');
+      }
+    });
+  });
   document.getElementById('logoutBtn').addEventListener('click', ()=>{
     if(typeof logOut === 'function') logOut();
-  });
-  document.getElementById('forgetDeviceBtn').addEventListener('click', ()=>{
-    if(confirm('This removes the saved admin login from this phone only. The shop\'s stock data is not affected, and other devices keep working normally. You\'ll need to set up a new login (or someone else\'s) to use the app on this phone again. Continue?')){
-      if(typeof clearAuth === 'function') clearAuth();
-      showToast('Login removed from this device.');
-      location.reload();
-    }
   });
   document.getElementById('resetBarcodesBtn').addEventListener('click', async ()=>{
     if(confirm('This unlinks every scanned barcode. You\'ll need to link them again next time you scan. Continue?')){

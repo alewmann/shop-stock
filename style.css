@@ -1,24 +1,24 @@
 :root{
-  --bg:#F3F0E8;
+  --bg:#EEF2F7;
   --surface:#FFFFFF;
-  --ink:#1C2420;
-  --ink-soft:#5E6A62;
-  --ink-faint:#96A099;
-  --line:#E5E1D3;
-  --primary:#1B3B33;
-  --primary-soft:#E5EBE6;
-  --primary-deep:#122A24;
-  --accent:#B4772A;
-  --accent-soft:#F6EAD6;
-  --danger:#AE3A34;
-  --danger-soft:#F7E6E4;
-  --success:#2E7A50;
+  --ink:#182432;
+  --ink-soft:#56637A;
+  --ink-faint:#93A0B4;
+  --line:#E1E7EF;
+  --primary:#1E3A5F;
+  --primary-soft:#E4EBF4;
+  --primary-deep:#122A44;
+  --accent:#2F8FDE;
+  --accent-soft:#E0F0FC;
+  --danger:#C0392B;
+  --danger-soft:#FBEAE8;
+  --success:#1F7A6C;
   --radius:16px;
   --radius-sm:11px;
   --serif: Georgia, 'Liberation Serif', 'Times New Roman', serif;
-  --shadow-sm: 0 1px 2px rgba(20,30,25,0.06), 0 1px 1px rgba(20,30,25,0.04);
-  --shadow-md: 0 8px 24px rgba(20,30,25,0.10), 0 2px 6px rgba(20,30,25,0.06);
-  --shadow-lg: 0 20px 50px rgba(10,20,16,0.28);
+  --shadow-sm: 0 1px 2px rgba(20,32,45,0.07), 0 1px 1px rgba(20,32,45,0.05);
+  --shadow-md: 0 8px 24px rgba(20,32,45,0.11), 0 2px 6px rgba(20,32,45,0.07);
+  --shadow-lg: 0 20px 50px rgba(10,20,35,0.30);
   --glass-bg: rgba(255,255,255,0.62);
   --glass-border: rgba(255,255,255,0.5);
   --glass-blur: blur(22px) saturate(180%);
@@ -54,19 +54,19 @@ body{
 }
 .bg-blobs::before{
   width:380px;height:380px;
-  background:radial-gradient(circle, #A8C6C9 0%, transparent 70%);
+  background:radial-gradient(circle, #A9C6E8 0%, transparent 70%);
   top:-100px; left:-120px;
   animation:driftA 22s ease-in-out infinite alternate;
 }
 .bg-blobs::after{
   width:340px;height:340px;
-  background:radial-gradient(circle, #D9AEBC 0%, transparent 70%);
+  background:radial-gradient(circle, #B7C3DC 0%, transparent 70%);
   bottom:120px; right:-110px;
   animation:driftB 26s ease-in-out infinite alternate;
 }
 .bg-blobs .blob{
   width:300px;height:300px;
-  background:radial-gradient(circle, #E8CD8E 0%, transparent 70%);
+  background:radial-gradient(circle, #8FC4DE 0%, transparent 70%);
   top:32%; right:-90px;
   animation:driftC 19s ease-in-out infinite alternate;
 }
@@ -235,6 +235,53 @@ main{flex:1;}
   font-family:var(--serif);
   font-size:16px;font-weight:700;color:var(--ink);
 }
+
+/* Home lists (recent sales, low stock, best sellers) */
+.home-list{
+  display:flex;flex-direction:column;gap:8px;
+  margin-bottom:22px;
+}
+.home-list-row{
+  display:flex;align-items:center;gap:11px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--radius-sm);
+  padding:11px 13px;
+  box-shadow:var(--shadow-sm);
+}
+.home-list-info{flex:1;min-width:0;}
+.home-list-name{font-size:13.5px;font-weight:700;color:var(--ink);}
+.home-list-sub{font-size:12px;color:var(--ink-soft);margin-top:1px;}
+.home-list-amt{font-size:13px;font-weight:700;color:var(--ink-soft);white-space:nowrap;}
+
+/* Stock status pills */
+.status-pill{
+  font-size:11px;font-weight:700;
+  padding:5px 10px;
+  border-radius:20px;
+  white-space:nowrap;
+}
+.status-healthy{background:var(--primary-soft); color:var(--primary);}
+.status-low{background:#FDF1DC; color:#9A6A0E;}
+.status-out{background:var(--danger-soft); color:var(--danger);}
+
+/* More menu */
+.more-menu{
+  display:flex;flex-direction:column;gap:8px;
+}
+.more-menu-item{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--radius-sm);
+  padding:15px 16px;
+  font-size:14.5px;
+  font-weight:700;
+  color:var(--ink);
+  box-shadow:var(--shadow-sm);
+  text-align:left;
+}
+.more-chevron{color:var(--ink-faint); font-size:18px; font-weight:400;}
 
 /* Segmented control */
 .segmented{
@@ -406,8 +453,8 @@ button.primary{
   box-shadow:0 4px 14px rgba(18,42,36,0.28);
 }
 button.accent{
-  background:linear-gradient(155deg, var(--accent), #9A6222);
-  border-color:#9A6222;
+  background:linear-gradient(155deg, var(--accent), #1D6FB8);
+  border-color:#1D6FB8;
   box-shadow:0 4px 14px rgba(180,119,42,0.28);
 }
 button.ghost{
@@ -669,8 +716,8 @@ input:focus,select:focus,textarea:focus{
   width:100%;
   display:flex;align-items:center;justify-content:center;gap:8px;
   padding:13px;
-  background:linear-gradient(155deg, var(--accent), #9A6222);
-  border-color:#9A6222;
+  background:linear-gradient(155deg, var(--accent), #1D6FB8);
+  border-color:#1D6FB8;
   color:#fff;
   box-shadow:0 4px 14px rgba(180,119,42,0.28);
 }

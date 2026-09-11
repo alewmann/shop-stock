@@ -88,7 +88,7 @@ function enterApp(role, label){
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   if(typeof applyRoleRestrictions === 'function') applyRoleRestrictions(role);
-  if(typeof renderStock === 'function') renderStock();
+  if(typeof renderHome === 'function') renderHome();
   startSessionTracking(role, label || getRememberedDisplayName());
 }
 

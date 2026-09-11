@@ -215,12 +215,16 @@ function subscribeAll(){
 }
 
 function refreshCurrentScreen(){
-  const stockActive = document.getElementById('screen-stock') && document.getElementById('screen-stock').classList.contains('active');
-  const historyActive = document.getElementById('screen-history') && document.getElementById('screen-history').classList.contains('active');
-  const settingsActive = document.getElementById('screen-settings') && document.getElementById('screen-settings').classList.contains('active');
-  if(stockActive && typeof renderStock === 'function') renderStock();
-  if(historyActive && typeof renderHistory === 'function') renderHistory();
-  if(settingsActive && typeof renderSettings === 'function') renderSettings();
+  const isActive = id => {
+    const el = document.getElementById(id);
+    return el && el.classList.contains('active');
+  };
+  if(isActive('screen-home') && typeof renderHome === 'function') renderHome();
+  if(isActive('screen-products') && typeof renderProducts === 'function') renderProducts();
+  if(isActive('screen-sales') && typeof renderSalesScreen === 'function') renderSalesScreen();
+  if(isActive('screen-stockhealth') && typeof renderStockHealth === 'function') renderStockHealth();
+  if(isActive('screen-history') && typeof renderHistory === 'function') renderHistory();
+  if(isActive('screen-settings') && typeof renderSettings === 'function') renderSettings();
   if(typeof updateLowStockUI === 'function') updateLowStockUI();
 }
 

@@ -6,9 +6,8 @@ function isStaff(){ return currentRole === 'staff'; }
 
 function applyRoleRestrictions(role){
   currentRole = role || 'admin';
-  document.querySelectorAll('.navbtn[data-action="new-restock"]').forEach(el=>{
-    el.style.display = isStaff() ? 'none' : '';
-  });
+  const stockBtn = document.getElementById('stockRestockBtn');
+  if(stockBtn) stockBtn.style.display = isStaff() ? 'none' : '';
   requestAnimationFrame(positionNavPill);
 }
 
@@ -79,15 +78,24 @@ function buzz(ms){
   try{ if(navigator.vibrate) navigator.vibrate(ms || 8); }catch(e){}
 }
 
+const NAV_PARENT = {
+  home:'home', products:'products', sales:'sales', stockhealth:'stockhealth', more:'more',
+  history:'more', settings:'more'
+};
+
 function showScreen(name){
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-'+name).classList.add('active');
+  const navTarget = NAV_PARENT[name] || name;
   document.querySelectorAll('.navbtn').forEach(b=>{
-    b.classList.toggle('active', b.dataset.screen === name);
+    b.classList.toggle('active', b.dataset.screen === navTarget);
   });
   requestAnimationFrame(positionNavPill);
   requestAnimationFrame(positionAllSegPills);
-  if(name === 'stock') renderStock();
+  if(name === 'home') renderHome();
+  if(name === 'products') renderProducts();
+  if(name === 'sales') renderSalesScreen();
+  if(name === 'stockhealth') renderStockHealth();
   if(name === 'history') renderHistory();
   if(name === 'settings') renderSettings();
 }
@@ -95,21 +103,34 @@ function showScreen(name){
 document.querySelectorAll('.navbtn[data-screen]').forEach(btn=>{
   btn.addEventListener('click', ()=> { buzz(6); showScreen(btn.dataset.screen); });
 });
-document.querySelector('[data-action="new-sale"]').addEventListener('click', ()=> startFlow('sale'));
-document.querySelector('[data-action="new-restock"]').addEventListener('click', ()=> startFlow('restock'));
 
 document.getElementById('lowStockBtn').addEventListener('click', ()=>{
-  showScreen('stock');
+  showScreen('stockhealth');
   window.scrollTo({top:0,behavior:'smooth'});
 });
 document.getElementById('lowStockBanner').addEventListener('click', ()=>{
-  showScreen('stock');
+  showScreen('stockhealth');
 });
 document.getElementById('scanBtn').addEventListener('click', ()=>{
   if(typeof openScanner === 'function') openScanner(handleScannedCode);
 });
+document.getElementById('salesRecordBtn').addEventListener('click', ()=> startFlow('sale'));
+document.getElementById('stockRestockBtn').addEventListener('click', ()=> startFlow('restock'));
+document.querySelectorAll('.more-menu-item').forEach(btn=>{
+  btn.addEventListener('click', ()=> { buzz(6); showScreen(btn.dataset.screen); });
+});
+document.querySelectorAll('.back-to-more').forEach(btn=>{
+  btn.addEventListener('click', ()=> showScreen('more'));
+});
 
-/* ---------- STOCK SCREEN ---------- */
+/* ---------- HOME (dashboard) ---------- */
+function greetingLabel(){
+  const h = new Date().getHours();
+  if(h < 12) return 'Good morning';
+  if(h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 function renderDashboard(){
   const totalUnits = state.items.reduce((s,it)=>s+totalQty(it),0);
   const today0 = new Date(); today0.setHours(0,0,0,0);
@@ -125,12 +146,12 @@ function renderDashboard(){
     </div>
     <div class="dash-grid">
       <div class="dash-card">
-        <div class="dash-card-label">Today's revenue</div>
+        <div class="dash-card-label">Today's sales</div>
         <div class="dash-card-val">${fmtBirr(todaysRevenue)}</div>
       </div>
       <div class="dash-card">
-        <div class="dash-card-label">Units in stock</div>
-        <div class="dash-card-val">${totalUnits}</div>
+        <div class="dash-card-label">Products</div>
+        <div class="dash-card-val">${state.items.length}</div>
       </div>
       <div class="dash-card ${lowCount>0 ? 'dash-card-warn' : ''}">
         <div class="dash-card-label">Low stock</div>
@@ -140,16 +161,103 @@ function renderDashboard(){
   `;
 }
 
-function greetingLabel(){
-  const h = new Date().getHours();
-  if(h < 12) return 'Good morning';
-  if(h < 17) return 'Good afternoon';
-  return 'Good evening';
+function renderBestSellers(){
+  const wrap = document.getElementById('homeBestSellers');
+  const totals = {};
+  state.transactions.forEach(t=>{
+    if(t.type !== 'sale') return;
+    totals[t.itemId] = (totals[t.itemId] || 0) + t.qty;
+  });
+  const ranked = Object.entries(totals)
+    .map(([itemId, qty]) => ({ item: state.items.find(i=>i.id===itemId), qty }))
+    .filter(r => r.item)
+    .sort((a,b) => b.qty - a.qty)
+    .slice(0, 3);
+
+  if(ranked.length === 0){
+    wrap.innerHTML = '';
+    return;
+  }
+  wrap.innerHTML = `
+    <div class="section-header"><span class="section-title">Best-selling products</span></div>
+    <div class="home-list">
+      ${ranked.map(r => `
+        <div class="home-list-row">
+          ${iconBadge(r.item)}
+          <div class="home-list-info">
+            <div class="home-list-name">${r.item.name}</div>
+            <div class="home-list-sub">${r.qty} sold all-time</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
 }
 
-function renderStock(){
+function renderHomeRecentSales(){
+  const wrap = document.getElementById('homeRecentSales');
+  const recent = state.transactions.filter(t=>t.type==='sale').slice(0, 5);
+  wrap.innerHTML = `
+    <div class="section-header"><span class="section-title">Recent sales</span></div>
+    ${recent.length === 0 ? '<div class="empty-note">No sales recorded yet.</div>' : `
+    <div class="home-list">
+      ${recent.map(t=>{
+        const d = new Date(t.timestamp);
+        return `
+        <div class="home-list-row">
+          <div class="hist-type sale">&minus;</div>
+          <div class="home-list-info">
+            <div class="home-list-name">${t.itemName} &middot; ${t.sizeLabel}</div>
+            <div class="home-list-sub">${t.qty} unit${t.qty>1?'s':''} &middot; ${d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}</div>
+          </div>
+          <div class="home-list-amt">${fmtBirr(t.amount)}</div>
+        </div>`;
+      }).join('')}
+    </div>`}
+  `;
+}
+
+function renderHomeLowStock(){
+  const wrap = document.getElementById('homeLowStock');
+  const rows = [];
+  state.items.forEach(item=>{
+    item.sizes.forEach(s=>{
+      if(s.qty <= s.threshold) rows.push({ item, size: s });
+    });
+  });
+  rows.sort((a,b) => a.size.qty - b.size.qty);
+  const shown = rows.slice(0, 8);
+
+  wrap.innerHTML = `
+    <div class="section-header"><span class="section-title">Low stock products</span></div>
+    ${shown.length === 0 ? '<div class="empty-note">Nothing running low right now.</div>' : `
+    <div class="home-list">
+      ${shown.map(r => `
+        <div class="home-list-row">
+          ${iconBadge(r.item)}
+          <div class="home-list-info">
+            <div class="home-list-name">${r.item.name}</div>
+            <div class="home-list-sub">Size ${r.size.label}</div>
+          </div>
+          <div class="home-list-amt" style="color:var(--danger);">${r.size.qty} left</div>
+        </div>
+      `).join('')}
+    </div>`}
+  `;
+}
+
+function renderHome(){
   renderDashboard();
+  renderBestSellers();
+  renderHomeRecentSales();
+  renderHomeLowStock();
+  updateLowStockUI();
+}
+
+/* ---------- PRODUCTS (catalog grid) ---------- */
+function renderProducts(){
   const grid = document.getElementById('itemGrid');
+  if(!grid) return;
   grid.innerHTML = '';
   state.items.forEach(item=>{
     const card = document.createElement('div');
@@ -197,10 +305,67 @@ function renderStock(){
     }
     card.addEventListener('click', ()=>{
       expandedItemId = expandedItemId === item.id ? null : item.id;
-      renderStock();
+      renderProducts();
     });
     grid.appendChild(card);
   });
+  updateLowStockUI();
+}
+
+/* ---------- SALES landing ---------- */
+function renderSalesScreen(){
+  const wrap = document.getElementById('salesTodayList');
+  const today0 = new Date(); today0.setHours(0,0,0,0);
+  const todays = state.transactions.filter(t=>t.type==='sale' && t.timestamp >= today0.getTime());
+
+  if(todays.length === 0){
+    wrap.innerHTML = '<div class="empty-note">No sales recorded yet today.</div>';
+    return;
+  }
+  wrap.innerHTML = `
+    <div class="home-list">
+      ${todays.map(t=>{
+        const d = new Date(t.timestamp);
+        return `
+        <div class="home-list-row">
+          <div class="hist-type sale">&minus;</div>
+          <div class="home-list-info">
+            <div class="home-list-name">${t.itemName} &middot; ${t.sizeLabel}</div>
+            <div class="home-list-sub">${t.qty} unit${t.qty>1?'s':''} &middot; ${d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}</div>
+          </div>
+          <div class="home-list-amt">${fmtBirr(t.amount)}</div>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+/* ---------- STOCK health ---------- */
+function stockStatus(item){
+  const total = totalQty(item);
+  if(total === 0) return 'out';
+  if(hasLowStock(item)) return 'low';
+  return 'healthy';
+}
+function renderStockHealth(){
+  const stockBtn = document.getElementById('stockRestockBtn');
+  if(stockBtn) stockBtn.style.display = isStaff() ? 'none' : '';
+
+  const wrap = document.getElementById('stockHealthList');
+  wrap.innerHTML = state.items.map(item=>{
+    const status = stockStatus(item);
+    const label = status === 'out' ? 'Out of stock' : status === 'low' ? 'Low stock' : 'Healthy';
+    return `
+      <div class="home-list-row">
+        ${iconBadge(item)}
+        <div class="home-list-info">
+          <div class="home-list-name">${item.name}</div>
+          <div class="home-list-sub">${totalQty(item)} in stock</div>
+        </div>
+        <span class="status-pill status-${status}">${label}</span>
+      </div>
+    `;
+  }).join('');
   updateLowStockUI();
 }
 
@@ -453,7 +618,7 @@ async function confirmBulkRestock(){
   `;
   document.getElementById('doneBtn').addEventListener('click', ()=>{
     expandedItemId = null;
-    showScreen('stock');
+    showScreen('stockhealth');
   });
   document.getElementById('anotherBtn').addEventListener('click', ()=>{
     startFlow('restock');
@@ -536,7 +701,7 @@ async function confirmFlow(){
   `;
   document.getElementById('doneBtn').addEventListener('click', ()=>{
     expandedItemId = null;
-    showScreen('stock');
+    showScreen(flow.mode === 'sale' ? 'sales' : 'stockhealth');
   });
   document.getElementById('anotherBtn').addEventListener('click', ()=>{
     startFlow(flow.mode);
@@ -544,10 +709,11 @@ async function confirmFlow(){
 }
 
 document.getElementById('flowBack').addEventListener('click', ()=>{
-  if(!flow) { showScreen('stock'); return; }
+  const fallback = (flow && flow.mode === 'restock') ? 'stockhealth' : 'sales';
+  if(!flow) { showScreen('home'); return; }
   if(flow.size){ flow.size = null; renderFlow(); }
   else if(flow.item){ flow.item = null; renderFlow(); }
-  else { showScreen('stock'); }
+  else { showScreen(fallback); }
 });
 
 /* ---------- HISTORY SCREEN ---------- */
@@ -907,7 +1073,7 @@ function renderSettings(){
       try{
         await cloudResetAll();
         showToast('All data reset.');
-        showScreen('stock');
+        showScreen('home');
       }catch(e){
         showToast('Could not reset — check your internet connection.');
       }

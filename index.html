@@ -95,13 +95,55 @@
   <!-- Main screens -->
   <main id="screens">
 
-    <!-- STOCK SCREEN -->
-    <section id="screen-stock" class="screen active">
+    <!-- HOME / DASHBOARD -->
+    <section id="screen-home" class="screen active">
       <div id="dashStats" class="dash-stats"></div>
+      <div id="homeBestSellers"></div>
+      <div id="homeRecentSales"></div>
+      <div id="homeLowStock"></div>
+    </section>
+
+    <!-- PRODUCTS (catalog grid) -->
+    <section id="screen-products" class="screen">
       <div class="section-header">
-        <span class="section-title">Inventory</span>
+        <span class="section-title">Products</span>
       </div>
       <div id="itemGrid" class="item-grid"></div>
+    </section>
+
+    <!-- SALES landing -->
+    <section id="screen-sales" class="screen">
+      <button class="primary full" id="salesRecordBtn" style="margin-bottom:18px;">Record a sale</button>
+      <div class="section-header">
+        <span class="section-title">Today's sales</span>
+      </div>
+      <div id="salesTodayList"></div>
+    </section>
+
+    <!-- STOCK health -->
+    <section id="screen-stockhealth" class="screen">
+      <button class="accent full" id="stockRestockBtn" style="margin-bottom:18px;">Restock an item</button>
+      <div class="section-header">
+        <span class="section-title">Stock health</span>
+      </div>
+      <div id="stockHealthList"></div>
+    </section>
+
+    <!-- MORE menu -->
+    <section id="screen-more" class="screen">
+      <div class="section-header">
+        <span class="section-title">More</span>
+      </div>
+      <div class="more-menu">
+        <button class="more-menu-item" data-screen="history">
+          <span>Sales &amp; restock history</span>
+          <span class="more-chevron">›</span>
+        </button>
+        <button class="more-menu-item" data-screen="settings">
+          <span>Settings</span>
+          <span class="more-chevron">›</span>
+        </button>
+      </div>
     </section>
 
     <!-- SALE / RESTOCK FLOW (shared) -->
@@ -115,6 +157,10 @@
 
     <!-- HISTORY SCREEN -->
     <section id="screen-history" class="screen">
+      <div class="flow-header">
+        <button class="text-btn back-to-more" aria-label="Back">&larr;</button>
+        <span class="flow-title">History</span>
+      </div>
       <div class="segmented" id="historySegmented">
         <div class="seg-pill"></div>
         <button class="seg-btn active" data-range="today">Today</button>
@@ -132,6 +178,10 @@
 
     <!-- SETTINGS SCREEN -->
     <section id="screen-settings" class="screen">
+      <div class="flow-header">
+        <button class="text-btn back-to-more" aria-label="Back">&larr;</button>
+        <span class="flow-title">Settings</span>
+      </div>
       <div id="settingsList"></div>
     </section>
 
@@ -140,25 +190,25 @@
   <!-- Bottom nav -->
   <nav class="bottomnav">
     <div class="nav-pill" id="navPill"></div>
-    <button class="navbtn active" data-screen="stock">
+    <button class="navbtn active" data-screen="home">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 11 L12 4 L20 11 V20 H14 V14 H10 V20 H4 Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+      <span>Home</span>
+    </button>
+    <button class="navbtn" data-screen="products">
       <svg viewBox="0 0 24 24" width="22" height="22"><rect x="3" y="3" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="3" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="3" y="13" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="13" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+      <span>Products</span>
+    </button>
+    <button class="navbtn" data-screen="sales">
+      <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.7"/><line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <span>Sales</span>
+    </button>
+    <button class="navbtn" data-screen="stockhealth">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 20 V11 M9.5 20 V6 M15 20 V13 M20.5 20 V8.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
       <span>Stock</span>
     </button>
-    <button class="navbtn" data-action="new-sale">
-      <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.7"/><line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-      <span>Sale</span>
-    </button>
-    <button class="navbtn" data-action="new-restock">
-      <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.7"/><line x1="12" y1="8" x2="12" y2="16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-      <span>Restock</span>
-    </button>
-    <button class="navbtn" data-screen="history">
-      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 4 v6 h6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 12.5 A8 8 0 1 0 6 6.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-      <span>History</span>
-    </button>
-    <button class="navbtn" data-screen="settings">
-      <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="2.8" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 3.5 v2.4 M12 18.1 v2.4 M20.5 12 h-2.4 M5.9 12 h-2.4 M17.8 6.2 l-1.7 1.7 M7.9 16.1 l-1.7 1.7 M17.8 17.8 l-1.7-1.7 M7.9 7.9 l-1.7-1.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-      <span>Settings</span>
+    <button class="navbtn" data-screen="more">
+      <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg>
+      <span>More</span>
     </button>
   </nav>
 

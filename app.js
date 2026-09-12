@@ -131,12 +131,57 @@ function greetingLabel(){
   return 'Good evening';
 }
 
+function last7DaysRevenue(){
+  const days = [];
+  for(let i=6; i>=0; i--){
+    const d = new Date();
+    d.setHours(0,0,0,0);
+    d.setDate(d.getDate() - i);
+    const start = d.getTime();
+    const end = start + 86400000;
+    const rev = state.transactions
+      .filter(t => t.type==='sale' && t.timestamp >= start && t.timestamp < end)
+      .reduce((s,t)=>s+t.amount,0);
+    days.push(rev);
+  }
+  return days;
+}
+
+function sparklinePath(values, w, h){
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = (max - min) || 1;
+  const stepX = w / (values.length - 1 || 1);
+  const pts = values.map((v,i) => {
+    const x = i * stepX;
+    const y = h - ((v - min) / range) * (h - 6) - 3;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  return pts.join(' ');
+}
+
 function renderDashboard(){
-  const totalUnits = state.items.reduce((s,it)=>s+totalQty(it),0);
   const today0 = new Date(); today0.setHours(0,0,0,0);
+  const weekAgo = today0.getTime() - 6*86400000;
   const todaysSales = state.transactions.filter(t=>t.type==='sale' && t.timestamp >= today0.getTime());
   const todaysRevenue = todaysSales.reduce((s,t)=>s+t.amount,0);
+  const todaysUnits = todaysSales.reduce((s,t)=>s+t.qty,0);
+  const weekRevenue = state.transactions.filter(t=>t.type==='sale' && t.timestamp >= weekAgo).reduce((s,t)=>s+t.amount,0);
   const lowCount = lowStockCount();
+
+  const week = last7DaysRevenue();
+  const yesterday = week[5];
+  let trendHtml = '';
+  if(yesterday > 0){
+    const pct = Math.round(((todaysRevenue - yesterday) / yesterday) * 100);
+    const up = pct >= 0;
+    trendHtml = `<span class="hero-trend ${up ? 'trend-up' : 'trend-down'}">${up ? '▲' : '▼'} ${Math.abs(pct)}%</span> from yesterday`;
+  }else if(todaysRevenue > 0){
+    trendHtml = `First sale logged today`;
+  }else{
+    trendHtml = `No sales yet today`;
+  }
+  const points = sparklinePath(week, 280, 56);
 
   const wrap = document.getElementById('dashStats');
   wrap.innerHTML = `
@@ -144,11 +189,18 @@ function renderDashboard(){
       <div class="dash-eyebrow">${greetingLabel()}</div>
       <div class="dash-date">${new Date().toLocaleDateString(undefined,{weekday:'long', month:'long', day:'numeric'})}</div>
     </div>
-    <div class="dash-grid">
-      <div class="dash-card">
-        <div class="dash-card-label">Today's sales</div>
-        <div class="dash-card-val">${fmtBirr(todaysRevenue)}</div>
-      </div>
+
+    <div class="hero-card">
+      <div class="hero-label">Today's sales</div>
+      <div class="hero-val">${fmtBirr(todaysRevenue)}</div>
+      <div class="hero-sub">${trendHtml}</div>
+      <svg class="hero-spark" viewBox="0 0 280 56" preserveAspectRatio="none">
+        <polyline points="${points}" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <polygon points="0,56 ${points} 280,56" fill="rgba(255,255,255,0.14)"/>
+      </svg>
+    </div>
+
+    <div class="dash-grid-2x2">
       <div class="dash-card">
         <div class="dash-card-label">Products</div>
         <div class="dash-card-val">${state.items.length}</div>
@@ -156,6 +208,14 @@ function renderDashboard(){
       <div class="dash-card ${lowCount>0 ? 'dash-card-warn' : ''}">
         <div class="dash-card-label">Low stock</div>
         <div class="dash-card-val">${lowCount}</div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-label">Units sold today</div>
+        <div class="dash-card-val">${todaysUnits}</div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-label">This week's sales</div>
+        <div class="dash-card-val">${fmtBirr(weekRevenue)}</div>
       </div>
     </div>
   `;
@@ -178,10 +238,19 @@ function renderBestSellers(){
     wrap.innerHTML = '';
     return;
   }
+  const [top, ...rest] = ranked;
   wrap.innerHTML = `
     <div class="section-header"><span class="section-title">Best-selling products</span></div>
-    <div class="home-list">
-      ${ranked.map(r => `
+    <div class="spotlight-card">
+      <div class="spotlight-icon">${iconBadge(top.item)}</div>
+      <div class="spotlight-info">
+        <div class="spotlight-tag">Bestseller</div>
+        <div class="spotlight-name">${top.item.name}</div>
+        <div class="spotlight-sub">${top.qty} units sold all-time</div>
+      </div>
+    </div>
+    ${rest.length ? `<div class="home-list">
+      ${rest.map(r => `
         <div class="home-list-row">
           ${iconBadge(r.item)}
           <div class="home-list-info">
@@ -190,7 +259,7 @@ function renderBestSellers(){
           </div>
         </div>
       `).join('')}
-    </div>
+    </div>` : ''}
   `;
 }
 

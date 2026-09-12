@@ -227,6 +227,75 @@ main{flex:1;}
 .dash-card-warn .dash-card-val{color:var(--danger);}
 .dash-card-warn .dash-card-label{color:var(--danger);opacity:0.8;}
 
+/* Hero card (today's sales, with sparkline) */
+.hero-card{
+  position:relative;
+  overflow:hidden;
+  background:linear-gradient(150deg, var(--primary), var(--primary-deep) 75%);
+  border-radius:20px;
+  padding:20px 20px 54px;
+  margin-bottom:12px;
+  box-shadow:0 14px 32px rgba(18,42,68,0.28);
+  isolation:isolate;
+}
+.hero-card::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:linear-gradient(160deg, rgba(255,255,255,0.16), rgba(255,255,255,0) 55%);
+  pointer-events:none;
+}
+.hero-label{
+  font-size:12px;font-weight:700;color:rgba(255,255,255,0.72);
+  text-transform:uppercase;letter-spacing:0.05em;
+}
+.hero-val{
+  font-family:var(--serif);
+  font-size:32px;font-weight:700;color:#fff;
+  margin-top:4px;letter-spacing:-0.01em;
+}
+.hero-sub{
+  font-size:12.5px;color:rgba(255,255,255,0.78);
+  margin-top:5px;font-weight:600;
+}
+.hero-trend{font-weight:800;}
+.hero-trend.trend-up{color:#8FE0B8;}
+.hero-trend.trend-down{color:#F5B8AE;}
+.hero-spark{
+  position:absolute;
+  left:0; right:0; bottom:0;
+  width:100%; height:56px;
+  display:block;
+}
+
+.dash-grid-2x2{
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;
+  margin-bottom:22px;
+}
+
+/* Bestseller spotlight card */
+.spotlight-card{
+  display:flex;align-items:center;gap:13px;
+  background:linear-gradient(150deg, var(--accent-soft), #F3F9FE);
+  border:1px solid rgba(47,143,222,0.18);
+  border-radius:var(--radius);
+  padding:14px 16px;
+  margin-bottom:10px;
+  box-shadow:var(--shadow-sm);
+}
+.spotlight-icon .item-icon{width:52px;height:52px;border-radius:14px;font-size:26px;}
+.spotlight-info{flex:1;min-width:0;}
+.spotlight-tag{
+  font-size:10.5px;font-weight:800;color:var(--accent);
+  text-transform:uppercase;letter-spacing:0.05em;
+}
+.spotlight-name{
+  font-family:var(--serif);
+  font-size:15.5px;font-weight:700;color:var(--ink);
+  margin-top:2px;
+}
+.spotlight-sub{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
+
 .section-header{
   display:flex;align-items:baseline;justify-content:space-between;
   margin-bottom:10px;
